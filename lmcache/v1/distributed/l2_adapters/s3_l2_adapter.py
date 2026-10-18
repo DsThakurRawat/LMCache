@@ -51,6 +51,7 @@ from lmcache.v1.distributed.l2_adapters.config import (
 from lmcache.v1.distributed.l2_adapters.factory import (
     register_l2_adapter_factory,
 )
+from lmcache.v1.key_extensions import KeyExtensions
 from lmcache.v1.platform import create_event_notifier
 
 logger = init_logger(__name__)
@@ -71,6 +72,9 @@ def _string_to_object_key(name: str) -> ObjectKey:
         ValueError: ``name`` does not match the expected format.
     """
     parts = name.split("@")
+    extension_token = ""
+    if len(parts) == 6:
+        extension_token = parts.pop()
     if len(parts) == 4:
         model_name, kv_rank_hex, object_group_id_hex, chunk_hash_hex = parts
         cache_salt = ""
@@ -109,6 +113,7 @@ def _string_to_object_key(name: str) -> ObjectKey:
         kv_rank=kv_rank,
         object_group_id=object_group_id,
         cache_salt=cache_salt,
+        extensions=KeyExtensions.from_storage_token(extension_token),
     )
 
 
@@ -178,14 +183,15 @@ def _object_key_to_string(key: ObjectKey) -> str:
 
     ``@`` in ``model_name`` and ``cache_salt`` is rejected by
     ``ObjectKey.__post_init__``, so the format is unambiguous.
+
+    Matching extensions append ``@<salt>@x1-<identity>`` to the core
+    name; request metadata never changes the storage name.
     """
     base = (
         f"{key.model_name}@{key.kv_rank:08x}"
         f"@{key.object_group_id:x}@{key.chunk_hash.hex()}"
     )
-    if key.cache_salt:
-        return f"{base}@{key.cache_salt}"
-    return base
+    return base + key.extensions.storage_suffix(key.cache_salt)
 
 
 def _format_safe_path(key_str: str) -> str:

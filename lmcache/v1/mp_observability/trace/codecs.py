@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 # Third Party
+import msgspec
 import torch
 
 # First Party
@@ -36,6 +37,7 @@ from lmcache.v1.distributed.api import (
     PrefetchLockMode,
     PrefetchTaskSpec,
 )
+from lmcache.v1.key_extensions import KeyExtensions
 
 
 @dataclass(frozen=True)
@@ -156,6 +158,8 @@ def _enc_object_key(k: ObjectKey) -> dict[str, Any]:
         "model_name": k.model_name,
         "kv_rank": k.kv_rank,
         "object_group_id": k.object_group_id,
+        "cache_salt": k.cache_salt,
+        "extensions": msgspec.to_builtins(k.extensions),
     }
 
 
@@ -165,6 +169,8 @@ def _dec_object_key(d: dict[str, Any]) -> ObjectKey:
         model_name=d["model_name"],
         kv_rank=d["kv_rank"],
         object_group_id=d.get("object_group_id", 0),
+        cache_salt=d.get("cache_salt", ""),
+        extensions=msgspec.convert(d.get("extensions", {}), type=KeyExtensions),
     )
 
 

@@ -10,6 +10,7 @@ the full integration without mocking internals.
 """
 
 # Standard
+from dataclasses import replace
 from typing import NoReturn
 import select
 import threading
@@ -28,6 +29,7 @@ from lmcache.v1.distributed.eviction_policy.noop import (
     NoOpEvictionPolicy,
 )
 from lmcache.v1.distributed.l1_manager import L1Manager
+from lmcache.v1.distributed.l2_adapters.base import L2TaskId
 from lmcache.v1.distributed.l2_adapters.mock_l2_adapter import (
     MockL2Adapter,
     MockL2AdapterConfig,
@@ -42,6 +44,7 @@ from lmcache.v1.distributed.storage_controllers.store_policy import (
     StorePolicy,
 )
 from lmcache.v1.distributed.storage_controllers.utils import L2AdapterDescriptor
+from lmcache.v1.key_extensions import KeyExtensions
 from lmcache.v1.memory_management import MemoryObj
 from tests.v1.distributed.utils import should_use_lazy_alloc
 
@@ -798,5 +801,44 @@ class TestBufferOnlyMode:
         )
         assert ok, "All keys should be deleted from L1 after buffer-only cleanup"
 
+        ctrl.stop()
+        adapter.close()
+
+
+def test_matching_extensions_split_store_batches(
+    l1_manager: L1Manager, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A single queued write splits incompatible identities, but not hints."""
+    adapter = make_adapter()
+    batches: list[list[ObjectKey]] = []
+    submit = adapter.submit_store_task
+
+    def record_batch(keys: list[ObjectKey], memory_objs: list[MemoryObj]) -> L2TaskId:
+        batches.append(list(keys))
+        return submit(keys, memory_objs)
+
+    monkeypatch.setattr(adapter, "submit_store_task", record_batch)
+    ctrl = StoreController(
+        l1_manager=l1_manager,
+        l2_adapters=[adapter],
+        adapter_descriptors=[make_descriptor(0)],
+        policy=DefaultStorePolicy(),
+    )
+    ext = KeyExtensions(identity=("bf16",), metadata=(("trace", "a"),))
+    keys = [
+        replace(make_object_key(0), extensions=ext),
+        replace(make_object_key(1), extensions=replace(ext, identity=("fp8",))),
+        replace(
+            make_object_key(2), extensions=replace(ext, metadata=(("trace", "b"),))
+        ),
+    ]
+    try:
+        # Queue all writes before starting the consumer to exercise one batch.
+        assert len(write_keys_to_l1(l1_manager, keys, make_layout())) == 3
+        ctrl.start()
+        assert wait_for_condition(lambda: adapter.debug_get_stored_object_count() == 3)
+        assert sorted(len(batch) for batch in batches) == [1, 2]
+        assert all(len({key.extensions for key in batch}) == 1 for batch in batches)
+    finally:
         ctrl.stop()
         adapter.close()

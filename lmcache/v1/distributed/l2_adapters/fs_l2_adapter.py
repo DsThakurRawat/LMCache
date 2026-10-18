@@ -44,6 +44,7 @@ from lmcache.v1.distributed.l2_adapters.config import (
 from lmcache.v1.distributed.l2_adapters.factory import (
     register_l2_adapter_factory,
 )
+from lmcache.v1.key_extensions import KeyExtensions
 from lmcache.v1.platform import create_event_notifier
 
 logger = init_logger(__name__)
@@ -110,15 +111,19 @@ def _object_key_to_filename(key: ObjectKey) -> str:
     ``kv_rank`` is written in ``0x`` prefixed hex so each byte
     of the bitmap ``(ws<<24)|(rank<<16)|(local_ws<<8)|local``
     is directly readable. ``object_group_id`` is written in plain hex.
+
+    Matching extensions append ``@<salt>@x1-<identity>`` to the core
+    name; request metadata never changes the storage name.
     """
     safe_model = key.model_name.replace("/", _PATH_SLASH_REPLACEMENT)
     base = (
         f"{safe_model}{_KEY_SEP}{key.kv_rank:#010x}"
         f"{_KEY_SEP}{key.object_group_id:x}{_KEY_SEP}{key.chunk_hash.hex()}"
     )
-    if key.cache_salt:
-        return f"{base}{_KEY_SEP}{key.cache_salt}{_FILE_EXT}"
-    return f"{base}{_FILE_EXT}"
+    filename = base + key.extensions.storage_suffix(key.cache_salt) + _FILE_EXT
+    if key.extensions.to_storage_token() and len(filename.encode("utf-8")) > 255:
+        raise ValueError("extended ObjectKey filename exceeds NAME_MAX (255 bytes)")
+    return filename
 
 
 def _filename_to_object_key(
@@ -126,15 +131,18 @@ def _filename_to_object_key(
 ) -> Optional[ObjectKey]:
     """Reverse ``_object_key_to_filename``.
 
-    Accepts both the 4-field unsalted shape and the 5-field salted
-    shape (trailing ``cache_salt``). Returns ``None`` for anything
-    else. Since ``model_name`` is guaranteed not to contain ``@``,
+    Accepts legacy four/five-field names and six-field names carrying
+    a versioned extension identity token. Returns ``None`` for invalid input.
+    Since ``model_name`` is guaranteed not to contain ``@``,
     plain ``split`` suffices — no marker, no rsplit.
     """
     if not filename.endswith(_FILE_EXT):
         return None
     stem = filename[: -len(_FILE_EXT)]
     parts = stem.split(_KEY_SEP)
+    extension_token = ""
+    if len(parts) == 6:
+        extension_token = parts.pop()
     if len(parts) == 4:
         safe_model, kv_rank_str, object_group_str, chunk_hash_hex = parts
         cache_salt = ""
@@ -159,6 +167,7 @@ def _filename_to_object_key(
             kv_rank=kv_rank,
             object_group_id=object_group_id,
             cache_salt=cache_salt,
+            extensions=KeyExtensions.from_storage_token(extension_token),
         )
     except ValueError:
         return None

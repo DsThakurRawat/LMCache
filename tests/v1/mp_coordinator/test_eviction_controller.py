@@ -14,6 +14,7 @@ import pytest
 # First Party
 from lmcache.v1.distributed.api import ObjectKey, Tier
 from lmcache.v1.distributed.quota_manager import QuotaManager
+from lmcache.v1.key_extensions import KeyExtensions
 from lmcache.v1.mp_coordinator.api import (
     CacheEventBatch,
     CacheEventEntry,
@@ -388,6 +389,7 @@ async def test_execute_evictions_dispatches_to_registered_instance():
                 "kv_rank": 0,
                 "object_group_id": 0,
                 "cache_salt": "alice",
+                "extensions": {"identity": [], "metadata": [], "named_identity": []},
             }
         ]
     }
@@ -999,3 +1001,14 @@ def test_restored_pins_on_other_groups_merge_into_one_entry():
     assert ctrl.filter_unpinned([k]) == []  # one of the two pins remains
     ctrl.unpin([k])
     assert ctrl.filter_unpinned([k]) == [k]
+
+
+def test_pin_capture_restore_keeps_matching_extensions() -> None:
+    source, _, _ = _setup()
+    ext = KeyExtensions(identity=("bf16",), named_identity=(("codec", "raw-v1"),))
+    key = replace(_make_key("tenant"), extensions=ext)
+    source.pin([key])
+    restored, _, _ = _setup()
+    restored.restore(source.capture())
+    incompatible = replace(key, extensions=replace(ext, identity=("fp8",)))
+    assert restored.filter_unpinned([key, incompatible]) == [incompatible]

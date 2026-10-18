@@ -16,6 +16,7 @@ import torch
 
 # First Party
 from lmcache.logging import init_logger
+from lmcache.v1.key_extensions import KeyExtensions
 
 if TYPE_CHECKING:
     # First Party
@@ -136,6 +137,9 @@ class ObjectKey:
     hash, and extension are added.
     """
 
+    extensions: KeyExtensions = field(default_factory=KeyExtensions)
+    """Opaque identity, named metadata, and named identity attributes."""
+
     _SALT_FORBIDDEN_CHARS = frozenset("@/\\\x00")
     _SALT_MAX_LEN = 128
 
@@ -167,6 +171,7 @@ class ObjectKey:
             kv_rank=self.kv_rank,
             object_group_id=self.object_group_id,
             cache_salt=self.cache_salt,
+            extensions=self.extensions,
         )
 
     @staticmethod
@@ -262,6 +267,8 @@ class EncodedObjectKey:
 
     cache_salt: str = ""
 
+    extensions: KeyExtensions = field(default_factory=KeyExtensions)
+
     def to_object_key(self) -> ObjectKey:
         """Recover the corresponding :class:`ObjectKey`.
 
@@ -275,6 +282,7 @@ class EncodedObjectKey:
             kv_rank=self.kv_rank,
             object_group_id=self.object_group_id,
             cache_salt=self.cache_salt,
+            extensions=self.extensions,
         )
 
 
@@ -647,6 +655,7 @@ def ipc_key_to_object_keys(
                 kv_rank=kv_rank,
                 object_group_id=object_group_id,
                 cache_salt=cache_salt,
+                extensions=ipc_key.extensions,
             )
             for chunk_hash in chunk_hashes
             for kv_rank in kv_ranks
@@ -716,6 +725,7 @@ def ipc_key_to_grouped_object_keys(
                             kv_rank=kv_rank,
                             object_group_id=object_group_id,
                             cache_salt=ipc_key.cache_salt,
+                            extensions=ipc_key.extensions,
                         )
                         for chunk_hash in chunk_hashes
                     ],

@@ -51,7 +51,7 @@ def _wire_key(key: ObjectKey) -> str:
         f"{key.model_name}@{key.kv_rank:08x}"
         f"@{key.object_group_id:x}@{key.chunk_hash.hex()}"
     )
-    return f"{base}@{key.cache_salt}" if key.cache_salt else base
+    return base + key.extensions.storage_suffix(key.cache_salt)
 
 
 class SageMakerHyperPodL2AdapterConfig(L2AdapterConfigBase):

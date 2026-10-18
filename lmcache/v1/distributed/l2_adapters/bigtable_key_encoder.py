@@ -31,8 +31,9 @@ class BigtableL2KeyEncoder:
             The formatted row key as bytes.
         """
         template = self.template
+        token = key.extensions.to_storage_token()
         # Strip @{salt} if salt is empty to prevent a trailing @
-        if not key.cache_salt and template.endswith("@{salt}"):
+        if not key.cache_salt and not token and template.endswith("@{salt}"):
             template = template[:-7]
 
         model_name = key.model_name
@@ -50,4 +51,6 @@ class BigtableL2KeyEncoder:
         )
         if hasattr(key, "layer_id"):
             row_key_str += f"@layer_{key.layer_id}"
+        if token:
+            row_key_str += f"@{token}"
         return row_key_str.encode("utf-8")

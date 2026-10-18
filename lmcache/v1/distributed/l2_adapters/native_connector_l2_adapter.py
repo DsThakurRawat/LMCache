@@ -81,14 +81,15 @@ def _object_key_to_string(key: ObjectKey) -> str:
     Salted (trailing ``cache_salt``)::
 
         <model_name>@<kv_rank_hex>@<object_group_id_hex>@<chunk_hash_hex>@<cache_salt>
+
+    Matching extensions append ``@<salt>@x1-<identity>`` to the core
+    name; request metadata never changes the storage name.
     """
     base = (
         f"{key.model_name}{_KEY_SEP}{key.kv_rank:08x}"
         f"{_KEY_SEP}{key.object_group_id:x}{_KEY_SEP}{key.chunk_hash.hex()}"
     )
-    if key.cache_salt:
-        return f"{base}{_KEY_SEP}{key.cache_salt}"
-    return base
+    return base + key.extensions.storage_suffix(key.cache_salt)
 
 
 def _obj_to_memoryview(

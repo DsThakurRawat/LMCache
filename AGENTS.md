@@ -206,3 +206,15 @@ canonical standard; this file intentionally does not duplicate it.
 
 When asked to review a PR, use the `pr-review` skill; before creating a PR,
 self-check with the `pre-pr-check` skill (both under `.claude/skills/`).
+
+## CPU key-codec validation without a GPU build
+
+A source-only checkout may import the lightweight key types but the root
+`tests/conftest.py` imports GPU connectors and requires `lmcache.device_ops`.
+For CPU key/transport tests, use `pytest --confcutdir=tests/v1 ...` to avoid that
+GPU fixture layer. Build the common native extensions for FS adapter tests with
+`NO_GPU_EXT=1 python setup.py build_ext --inplace` after installing the build
+requirements and torch. This builds `lmcache_native` and `lmcache_fs`; it does
+not provide GPU device operations. Regenerate protobuf bindings with
+`python lmcache/v1/multiprocess/transport/grpc_impl/_proto_gen/_generate.py`
+after editing schemas.

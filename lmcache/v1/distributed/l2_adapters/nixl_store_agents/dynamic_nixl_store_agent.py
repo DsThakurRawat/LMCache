@@ -37,7 +37,7 @@ def _object_key_to_filename(key: ObjectKey) -> str:
     """
     safe_model_name = key.model_name.replace("/", "--")
     chunk_hex = key.chunk_hash.hex()
-    salt_suffix = f"@{key.cache_salt}" if key.cache_salt else ""
+    salt_suffix = key.extensions.storage_suffix(key.cache_salt)
     return (
         f"{safe_model_name}_{key.kv_rank:08x}_"
         f"{key.object_group_id:x}_{chunk_hex}{salt_suffix}.bin"
