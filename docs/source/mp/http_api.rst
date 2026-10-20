@@ -788,18 +788,18 @@ Each ``EncodedObjectKey`` is
 .. code-block:: json
 
     {
-      "chunk_hash_hex": "abc123...",
-      "namespace": {
+      "identity": {
+        "chunk_hash_hex": "abc123...",
+        "kv_rank": 0,
+        "object_group_id": 0,
         "model_name": "meta-llama/Llama-3-8B",
         "cache_salt": "user-a",
         "tags": {}
-      },
-      "kv_rank": 0,
-      "object_group_id": 0
+      }
     }
 
-``namespace.model_name`` is required. ``object_group_id`` defaults to ``0``;
-``namespace.cache_salt`` and ``namespace.tags`` default to ``""`` and ``{}``.
+``identity.model_name`` is required. ``identity.object_group_id`` defaults to ``0``;
+``identity.cache_salt`` and ``identity.tags`` default to ``""`` and ``{}``.
 
 **Response** (``200 OK``):
 
@@ -821,7 +821,7 @@ with ``ok=false`` and an ``error`` field carrying the reason.
 - ``200``: request processed (check ``ok`` for the L2 adapter outcome).
 - ``400``: batch exceeds the limit, or the chunk hash is not valid hex.
 - ``422``: request validation fails, including an invalid model name or salt
-  in the nested namespace.
+  in the nested identity.
 - ``404``: ``adapter`` (body) does not match any configured adapter.
 - ``422``: Pydantic-level body-shape failure (missing ``keys``,
   wrong field types).
@@ -889,10 +889,10 @@ cause keys to appear, disappear, or shift between pages.
       "entries": [
         {
           "key": {
-            "chunk_hash_hex": "abc123",
-            "kv_rank": 0,
-            "object_group_id": 0,
-            "namespace": {
+            "identity": {
+              "chunk_hash_hex": "abc123",
+              "kv_rank": 0,
+              "object_group_id": 0,
               "model_name": "meta-llama/Llama-3-8B",
               "cache_salt": "user-a",
               "tags": {}

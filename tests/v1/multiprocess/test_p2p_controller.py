@@ -15,7 +15,7 @@ import torch
 
 # First Party
 from lmcache.lmcache_native import Bitmap
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey, PrefetchResult
 from lmcache.v1.distributed.l2_adapters.p2p_l2_adapter import P2PL2AdapterConfig
 from lmcache.v1.distributed.transfer_channel.api import TransferChannelAddress
@@ -47,10 +47,12 @@ def _result(rows: list[Bitmap]) -> PrefetchResult:
 
 def _make_key(i: int, object_group_id: int = 0) -> ObjectKey:
     return ObjectKey(
-        chunk_hash=f"hash{i}".encode(),
-        namespace=CacheNamespace(model_name="test_model"),
-        kv_rank=1,
-        object_group_id=object_group_id,
+        identity=ObjectKeyIdentity(
+            model_name="test_model",
+            chunk_hash=f"hash{i}".encode(),
+            kv_rank=1,
+            object_group_id=object_group_id,
+        )
     )
 
 

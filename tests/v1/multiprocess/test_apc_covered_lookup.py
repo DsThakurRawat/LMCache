@@ -23,7 +23,7 @@ import threading
 import pytest
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import IPCKeyIdentity, ObjectKeyIdentity
 from lmcache.v1.distributed.api import ObjectKey
 from lmcache.v1.multiprocess.custom_types import IPCCacheServerKey
 from lmcache.v1.multiprocess.modules.lookup import resolve_prefetched_obj_keys
@@ -61,12 +61,14 @@ class _FakeRequest:
 def _make_key(n_chunks: int, start_chunks: int = 0) -> IPCCacheServerKey:
     n_tokens = n_chunks * CHUNK_SIZE
     return IPCCacheServerKey(
-        namespace=CacheNamespace(model_name="m"),
-        world_size=1,
-        worker_id=None,
-        token_ids=tuple(range(n_tokens)),
-        start=start_chunks * CHUNK_SIZE,
-        end=n_tokens,
+        identity=IPCKeyIdentity(
+            model_name="m",
+            world_size=1,
+            worker_id=None,
+            token_ids=tuple(range(n_tokens)),
+            start=start_chunks * CHUNK_SIZE,
+            end=n_tokens,
+        ),
         request_id="r",
         num_kv_readers=1,
     )
@@ -105,9 +107,9 @@ def test_touch_cached_keys_hits_both_tiers():
 
     keys = [
         ObjectKey(
-            chunk_hash=ObjectKey.IntHash2Bytes(7),
-            namespace=CacheNamespace(model_name="m"),
-            kv_rank=0,
+            identity=ObjectKeyIdentity(
+                model_name="m", chunk_hash=ObjectKey.IntHash2Bytes(7), kv_rank=0
+            )
         )
     ]
     StorageManager.touch_cached_keys(sm, keys)
@@ -392,9 +394,9 @@ def test_serde_wrapper_forwards_touch_to_the_inner_adapter():
     wrapper._inner = inner
     keys = [
         ObjectKey(
-            chunk_hash=ObjectKey.IntHash2Bytes(3),
-            namespace=CacheNamespace(model_name="m"),
-            kv_rank=0,
+            identity=ObjectKeyIdentity(
+                model_name="m", chunk_hash=ObjectKey.IntHash2Bytes(3), kv_rank=0
+            )
         )
     ]
 

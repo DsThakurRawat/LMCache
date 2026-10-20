@@ -35,7 +35,7 @@ import zmq
 from lmcache import torch_dev
 from lmcache.logging import init_logger
 from lmcache.utils import EngineType
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import IPCKeyIdentity
 from lmcache.v1.gpu_connector.kv_format.types import LayoutHints
 from lmcache.v1.multiprocess.custom_types import (
     IPCCacheServerKey,
@@ -119,14 +119,14 @@ class LMCacheMPKvConnectorScheduler(KvCacheConnectorScheduler):
         request_configs: Optional[dict[str, int]] = None,
     ) -> IPCCacheServerKey:
         return IPCCacheServerKey(
-            namespace=CacheNamespace(model_name=self._model_name),
-            world_size=self._world_size,
-            # Each worker stores and reads only its own object (no MLA-style
-            # sharing in this adapter yet).
-            worker_id=None,
-            token_ids=tuple(token_ids),
-            start=start,
-            end=end,
+            identity=IPCKeyIdentity(
+                model_name=self._model_name,
+                world_size=self._world_size,
+                worker_id=None,
+                token_ids=tuple(token_ids),
+                start=start,
+                end=end,
+            ),
             request_id=str(request_id),
             request_configs=request_configs,
             num_kv_readers=1,
@@ -312,12 +312,14 @@ class LMCacheMPKvConnectorWorker(KvCacheConnectorWorker):
     ) -> IPCCacheServerKey:
         aligned_end = (len(token_ids) // self._chunk_size) * self._chunk_size
         return IPCCacheServerKey(
-            namespace=CacheNamespace(model_name=self._model_name),
-            world_size=self._world_size,
-            worker_id=self._rank,
-            token_ids=tuple(token_ids),
-            start=0,
-            end=aligned_end,
+            identity=IPCKeyIdentity(
+                model_name=self._model_name,
+                world_size=self._world_size,
+                worker_id=self._rank,
+                token_ids=tuple(token_ids),
+                start=0,
+                end=aligned_end,
+            ),
             request_id=str(request_id),
             num_kv_readers=1,
         )

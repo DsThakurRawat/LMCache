@@ -14,7 +14,7 @@ import time
 import torch
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.serde.fp8 import (
     Fp8QuantizationDeserializer,
@@ -103,7 +103,9 @@ def benchmark_one(
     enc = _FakeMemoryObj(compressed)
     dec = _FakeMemoryObj(recovered)
     # fp8 / TurboQuant ignore the key; pass an empty ObjectKey.
-    key = ObjectKey(chunk_hash=b"", namespace=CacheNamespace(model_name=""), kv_rank=0)
+    key = ObjectKey(
+        identity=ObjectKeyIdentity(model_name="", chunk_hash=b"", kv_rank=0)
+    )
 
     for _ in range(warmup):
         written = serializer.serialize(src, enc, key)

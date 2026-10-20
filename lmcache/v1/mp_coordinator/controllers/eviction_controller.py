@@ -21,7 +21,7 @@ import msgspec
 
 # First Party
 from lmcache.logging import init_logger
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import EncodedObjectKeyIdentity
 from lmcache.v1.distributed.api import EncodedObjectKey, Tier
 from lmcache.v1.distributed.eviction import EvictionPolicy
 from lmcache.v1.distributed.eviction_policy.isolated_lru import (
@@ -501,16 +501,9 @@ def _decode_pin(entry: Mapping[str, object]) -> tuple[ObjectKey, int]:
         The key and its pin count.
     """
     fields = cast("Mapping[str, object]", entry["key"])
-    namespace = {
-        "model_name": fields.get("model_name", ""),
-        "cache_salt": fields.get("cache_salt", ""),
-        **cast("Mapping[str, object]", fields.get("namespace", {})),
-    }
+    identity = fields.get("identity", fields)
     encoded = EncodedObjectKey(
-        chunk_hash_hex=str(fields["chunk_hash_hex"]),
-        namespace=msgspec.convert(namespace, type=CacheNamespace),
-        kv_rank=cast(int, fields["kv_rank"]),
-        object_group_id=cast(int, fields["object_group_id"]),
+        identity=msgspec.convert(identity, type=EncodedObjectKeyIdentity)
     )
     return encoded.to_object_key(), cast(int, entry["count"])
 
@@ -521,4 +514,8 @@ def _pinned_chunk_key(key: ObjectKey) -> ObjectKey:
     A pin is on a chunk, which ``--separate-object-groups`` stores once per
     object group; dropping the group makes one pin cover them all.
     """
-    return replace(key, object_group_id=0) if key.object_group_id else key
+    return (
+        replace(key, identity=replace(key.identity, object_group_id=0))
+        if key.object_group_id
+        else key
+    )

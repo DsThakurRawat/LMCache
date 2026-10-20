@@ -13,19 +13,19 @@ from dataclasses import asdict
 import pytest
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import EncodedObjectKeyIdentity, ObjectKeyIdentity
 from lmcache.v1.distributed.api import EncodedObjectKey, ObjectKey
 
 
 def _make_object_key(**overrides) -> ObjectKey:
     return ObjectKey(
-        chunk_hash=bytes.fromhex(overrides.get("chunk_hash_hex", "deadbeef")),
-        namespace=CacheNamespace(
+        identity=ObjectKeyIdentity(
             model_name=overrides.get("model_name", "llama"),
             cache_salt=overrides.get("cache_salt", ""),
-        ),
-        kv_rank=overrides.get("kv_rank", 7),
-        object_group_id=overrides.get("object_group_id", 0),
+            chunk_hash=bytes.fromhex(overrides.get("chunk_hash_hex", "deadbeef")),
+            kv_rank=overrides.get("kv_rank", 7),
+            object_group_id=overrides.get("object_group_id", 0),
+        )
     )
 
 
@@ -59,9 +59,9 @@ class TestRoundTrip:
         # bytes.fromhex accepts uppercase; the recovered ObjectKey
         # then re-projects to lowercase via bytes.hex().
         ck = EncodedObjectKey(
-            chunk_hash_hex="DEADBEEF",
-            namespace=CacheNamespace(model_name="m"),
-            kv_rank=0,
+            identity=EncodedObjectKeyIdentity(
+                model_name="m", chunk_hash_hex="DEADBEEF", kv_rank=0
+            )
         )
         obj = ck.to_object_key()
         assert obj.chunk_hash == b"\xde\xad\xbe\xef"
@@ -69,7 +69,9 @@ class TestRoundTrip:
 
     def test_optional_fields_default(self):
         ck = EncodedObjectKey(
-            chunk_hash_hex="aa", namespace=CacheNamespace(model_name="m"), kv_rank=0
+            identity=EncodedObjectKeyIdentity(
+                model_name="m", chunk_hash_hex="aa", kv_rank=0
+            )
         )
         assert ck.object_group_id == 0
         assert ck.cache_salt == ""
@@ -78,29 +80,32 @@ class TestRoundTrip:
         # Wire callers serialize via ``dataclasses.asdict`` — the field
         # set is the public contract.
         ck = EncodedObjectKey(
-            chunk_hash_hex="aa",
-            namespace=CacheNamespace(model_name="m", cache_salt="x"),
-            kv_rank=0,
-            object_group_id=1,
+            identity=EncodedObjectKeyIdentity(
+                model_name="m",
+                cache_salt="x",
+                chunk_hash_hex="aa",
+                kv_rank=0,
+                object_group_id=1,
+            )
         )
         assert asdict(ck) == {
-            "chunk_hash_hex": "aa",
-            "kv_rank": 0,
-            "object_group_id": 1,
-            "namespace": {
+            "identity": {
                 "model_name": "m",
                 "cache_salt": "x",
                 "tags": {},
-            },
+                "chunk_hash_hex": "aa",
+                "kv_rank": 0,
+                "object_group_id": 1,
+            }
         }
 
 
 class TestToObjectKeyValidation:
     def test_rejects_non_hex_chunk_hash(self):
         ck = EncodedObjectKey(
-            chunk_hash_hex="not-hex",
-            namespace=CacheNamespace(model_name="m"),
-            kv_rank=0,
+            identity=EncodedObjectKeyIdentity(
+                model_name="m", chunk_hash_hex="not-hex", kv_rank=0
+            )
         )
         with pytest.raises(ValueError):
             ck.to_object_key()
@@ -108,9 +113,9 @@ class TestToObjectKeyValidation:
     def test_namespace_rejects_invalid_model(self):
         with pytest.raises(ValueError, match="model_name"):
             EncodedObjectKey(
-                chunk_hash_hex="aa",
-                namespace=CacheNamespace(model_name="bad@name"),
-                kv_rank=0,
+                identity=EncodedObjectKeyIdentity(
+                    model_name="bad@name", chunk_hash_hex="aa", kv_rank=0
+                )
             )
 
 

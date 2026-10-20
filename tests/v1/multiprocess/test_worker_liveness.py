@@ -19,7 +19,7 @@ import pytest
 import zmq
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import ObjectKey
 from lmcache.v1.mp_observability.event import Event, EventType
 from lmcache.v1.mp_observability.event_bus import EventBus, EventBusConfig
@@ -76,9 +76,9 @@ def _publish_kv(bus: EventBus, event_type: EventType, **metadata: Any) -> None:
 
 def _event_key(index: int, model: str = "model", rank: int = 0) -> ObjectKey:
     return ObjectKey(
-        chunk_hash=bytes([index]) * 32,
-        namespace=CacheNamespace(model_name=model),
-        kv_rank=rank,
+        identity=ObjectKeyIdentity(
+            model_name=model, chunk_hash=bytes([index]) * 32, kv_rank=rank
+        )
     )
 
 

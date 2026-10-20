@@ -46,13 +46,13 @@ def _store_one_key(client: TestClient) -> None:
                     "entries": [
                         {
                             "key": {
-                                "chunk_hash_hex": "aa",
-                                "kv_rank": 0,
-                                "namespace": {
+                                "identity": {
                                     "model_name": "m",
                                     "cache_salt": "",
                                     "tags": {},
-                                },
+                                    "chunk_hash_hex": "aa",
+                                    "kv_rank": 0,
+                                }
                             },
                             "size_bytes": 1024,
                         }

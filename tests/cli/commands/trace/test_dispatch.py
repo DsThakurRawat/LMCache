@@ -17,7 +17,7 @@ from lmcache.cli.commands.trace._dispatch import (
     ReplayContext,
     build_default_dispatcher,
 )
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import ObjectKey
 
 _SM_PREFIX = "lmcache.v1.distributed.storage_manager.StorageManager"
@@ -67,7 +67,7 @@ class _FakeCM:
 
 def _key(i: int) -> ObjectKey:
     return ObjectKey(
-        chunk_hash=bytes([i]), namespace=CacheNamespace(model_name="test"), kv_rank=0
+        identity=ObjectKeyIdentity(model_name="test", chunk_hash=bytes([i]), kv_rank=0)
     )
 
 

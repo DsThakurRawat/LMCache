@@ -13,7 +13,7 @@ import pytest
 
 # First Party
 from lmcache.lmcache_native import Bitmap
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import IPCKeyIdentity
 from lmcache.v1.distributed.api import AttnWindowDesc, PrefetchHandle, PrefetchResult
 from lmcache.v1.mp_observability.event import EventType
 from lmcache.v1.multiprocess.custom_types import IPCCacheServerKey
@@ -167,12 +167,14 @@ def test_server_free_lookup_locks_calls_finish_read_prefetched():
 def _free_locks_key(num_tokens: int, start: int, end: int) -> IPCCacheServerKey:
     """Build a lookup-style (worker_id=None) key over [start, end)."""
     return IPCCacheServerKey(
-        namespace=CacheNamespace(model_name="testmodel"),
-        world_size=1,
-        worker_id=None,
-        token_ids=tuple(range(num_tokens)),
-        start=start,
-        end=end,
+        identity=IPCKeyIdentity(
+            model_name="testmodel",
+            world_size=1,
+            worker_id=None,
+            token_ids=tuple(range(num_tokens)),
+            start=start,
+            end=end,
+        ),
         request_id="req-sw",
         num_kv_readers=1,
     )
@@ -398,12 +400,14 @@ def test_server_free_lookup_locks_no_matching_chunks():
 
     # Key with start == end means no chunks to free
     key = IPCCacheServerKey(
-        namespace=CacheNamespace(model_name="testmodel"),
-        world_size=1,
-        worker_id=None,
-        token_ids=tuple(range(256)),
-        start=0,
-        end=0,
+        identity=IPCKeyIdentity(
+            model_name="testmodel",
+            world_size=1,
+            worker_id=None,
+            token_ids=tuple(range(256)),
+            start=0,
+            end=0,
+        ),
         request_id="req-empty",
         num_kv_readers=1,
     )

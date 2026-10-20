@@ -226,13 +226,13 @@ class TestOtherApis:
             "keys": [
                 {
                     "key": {
-                        "chunk_hash_hex": "ab" * 32,
-                        "kv_rank": 0,
-                        "namespace": {
+                        "identity": {
                             "model_name": "m",
                             "cache_salt": "tenant-a",
                             "tags": {},
-                        },
+                            "chunk_hash_hex": "ab" * 32,
+                            "kv_rank": 0,
+                        }
                     },
                     "placements": [
                         {"instance_id": "mp-1", "tier": "l1", "backend": "dram"}

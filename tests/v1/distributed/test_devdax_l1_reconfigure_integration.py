@@ -24,7 +24,7 @@ import pytest
 import torch
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.config import (
     EvictionConfig,
@@ -120,9 +120,11 @@ def _layout(num_bytes: int = SLOT_BYTES) -> MemoryLayoutDesc:
 
 def _key(seed: int) -> ObjectKey:
     return ObjectKey(
-        chunk_hash=seed.to_bytes(4, "big") + b"\0" * 28,
-        namespace=CacheNamespace(model_name="devdax-l1-reconfig-it"),
-        kv_rank=0,
+        identity=ObjectKeyIdentity(
+            model_name="devdax-l1-reconfig-it",
+            chunk_hash=seed.to_bytes(4, "big") + b"\0" * 28,
+            kv_rank=0,
+        )
     )
 
 

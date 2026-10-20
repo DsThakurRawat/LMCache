@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import ObjectKey, Tier
 from lmcache.v1.mp_coordinator.api import (
     BlendNamespace,
@@ -423,14 +423,17 @@ def _key(
     """Build a key the way a server would, so ``kv_rank`` carries the
     world size the namespace is derived from."""
     return ObjectKey(
-        chunk_hash=bytes([hash_byte]) * 4,
-        namespace=CacheNamespace(model_name=model_name, cache_salt=cache_salt),
-        kv_rank=ObjectKey.ComputeKVRank(
-            world_size=world_size,
-            global_rank=rank,
-            local_world_size=world_size,
-            local_rank=rank,
-        ),
+        identity=ObjectKeyIdentity(
+            model_name=model_name,
+            cache_salt=cache_salt,
+            chunk_hash=bytes([hash_byte]) * 4,
+            kv_rank=ObjectKey.ComputeKVRank(
+                world_size=world_size,
+                global_rank=rank,
+                local_world_size=world_size,
+                local_rank=rank,
+            ),
+        )
     )
 
 

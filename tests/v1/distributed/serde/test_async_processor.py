@@ -17,7 +17,7 @@ import select
 import time
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.serde import (
     AsyncSerdeProcessor,
@@ -27,7 +27,7 @@ from lmcache.v1.distributed.serde import (
 from lmcache.v1.platform import consume_fd
 
 _TEST_KEY = ObjectKey(
-    chunk_hash=b"\x00" * 32, namespace=CacheNamespace(model_name="test"), kv_rank=0
+    identity=ObjectKeyIdentity(model_name="test", chunk_hash=b"\x00" * 32, kv_rank=0)
 )
 
 

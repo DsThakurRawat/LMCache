@@ -7,7 +7,7 @@ Unit tests for :class:`IsolatedLRUEvictionPolicy`.
 import pytest
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import ObjectKey
 from lmcache.v1.distributed.eviction_policy.isolated_lru import (
     IsolatedLRUEvictionPolicy,
@@ -18,9 +18,12 @@ from lmcache.v1.mp_coordinator.utils.encoding import encode_key
 
 def _key(chunk_id: int, cache_salt: str = "") -> ObjectKey:
     return ObjectKey(
-        chunk_hash=ObjectKey.IntHash2Bytes(chunk_id),
-        namespace=CacheNamespace(model_name="m", cache_salt=cache_salt),
-        kv_rank=0,
+        identity=ObjectKeyIdentity(
+            model_name="m",
+            cache_salt=cache_salt,
+            chunk_hash=ObjectKey.IntHash2Bytes(chunk_id),
+            kv_rank=0,
+        )
     )
 
 

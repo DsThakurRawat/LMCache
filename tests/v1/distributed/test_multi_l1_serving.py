@@ -11,7 +11,7 @@ import pytest
 import torch
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.config import (
     DevDaxL1ManagerConfig,
@@ -95,9 +95,11 @@ def test_dram_devdax_serving_round_trip(tmp_path: Path) -> None:
     storage = StorageManager(config)
     keys = [
         ObjectKey(
-            chunk_hash=ObjectKey.IntHash2Bytes(i),
-            namespace=CacheNamespace(model_name="multi-serving"),
-            kv_rank=0,
+            identity=ObjectKeyIdentity(
+                model_name="multi-serving",
+                chunk_hash=ObjectKey.IntHash2Bytes(i),
+                kv_rank=0,
+            )
         )
         for i in range(3)
     ]
@@ -168,9 +170,9 @@ def test_fixed_affinity_loads_into_nondefault_l1(tmp_path: Path) -> None:
     storage = StorageManager(config)
     keys = [
         ObjectKey(
-            chunk_hash=ObjectKey.IntHash2Bytes(i),
-            namespace=CacheNamespace(model_name="affinity"),
-            kv_rank=0,
+            identity=ObjectKeyIdentity(
+                model_name="affinity", chunk_hash=ObjectKey.IntHash2Bytes(i), kv_rank=0
+            )
         )
         for i in range(3)
     ]

@@ -35,7 +35,7 @@ import pytest
 import torch
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.serde.asym_k16_v8 import (
     AsymK16V8MultiSerializer,
@@ -46,7 +46,7 @@ from lmcache.v1.distributed.serde.multi import MemoryObjGroup
 from lmcache.v1.memory_management import MemoryObj
 
 _TEST_KEY = ObjectKey(
-    chunk_hash=b"\x00" * 32, namespace=CacheNamespace(model_name="test"), kv_rank=0
+    identity=ObjectKeyIdentity(model_name="test", chunk_hash=b"\x00" * 32, kv_rank=0)
 )
 
 # Mirror the _FakeMemoryObj used elsewhere; lets the test stay GPU-free

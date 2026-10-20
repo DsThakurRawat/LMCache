@@ -12,7 +12,7 @@ import httpx
 import pytest
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import ObjectKey, Tier
 from lmcache.v1.distributed.quota_manager import QuotaManager
 from lmcache.v1.mp_coordinator.api import (
@@ -38,9 +38,9 @@ from lmcache.v1.mp_coordinator.views.usage_manager import CacheUsageManager
 
 def _make_key(salt: str, model: str = "m", rank: int = 0, h: str = "aa") -> ObjectKey:
     return ObjectKey(
-        chunk_hash=bytes.fromhex(h),
-        namespace=CacheNamespace(model_name=model, cache_salt=salt),
-        kv_rank=rank,
+        identity=ObjectKeyIdentity(
+            model_name=model, cache_salt=salt, chunk_hash=bytes.fromhex(h), kv_rank=rank
+        )
     )
 
 
@@ -383,14 +383,14 @@ async def test_execute_evictions_dispatches_to_registered_instance():
     assert body == {
         "keys": [
             {
-                "chunk_hash_hex": "aa",
-                "kv_rank": 0,
-                "object_group_id": 0,
-                "namespace": {
+                "identity": {
                     "model_name": "m",
                     "cache_salt": "alice",
                     "tags": {},
-                },
+                    "chunk_hash_hex": "aa",
+                    "kv_rank": 0,
+                    "object_group_id": 0,
+                }
             }
         ]
     }
@@ -944,7 +944,7 @@ async def test_the_controller_dispatches_to_the_shared_membership_view():
 
 
 def _in_group(key: ObjectKey, group: int) -> ObjectKey:
-    return replace(key, object_group_id=group)
+    return replace(key, identity=replace(key.identity, object_group_id=group))
 
 
 def test_a_pin_covers_its_chunk_in_every_object_group():
@@ -1008,12 +1008,10 @@ def test_pin_capture_restore_keeps_namespace() -> None:
     source, _, _ = _setup()
     key = replace(
         _make_key("tenant"),
-        namespace=CacheNamespace(model_name="model", tags={"dtype": "bf16"}),
+        identity=replace(_make_key("tenant").identity, tags={"dtype": "bf16"}),
     )
     source.pin([key])
     restored, _, _ = _setup()
     restored.restore(source.capture())
-    incompatible = replace(
-        key, namespace=CacheNamespace(model_name="model", tags={"dtype": "fp8"})
-    )
+    incompatible = replace(key, identity=replace(key.identity, tags={"dtype": "fp8"}))
     assert restored.filter_unpinned([key, incompatible]) == [incompatible]

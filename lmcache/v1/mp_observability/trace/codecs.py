@@ -24,11 +24,10 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 # Third Party
-import msgspec
 import torch
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import (
     AttnWindowDesc,
     GroupedObjectKeys,
@@ -154,24 +153,28 @@ def decode_args(args: dict[str, Any]) -> dict[str, Any]:
 
 def _enc_object_key(k: ObjectKey) -> dict[str, Any]:
     return {
-        "chunk_hash": k.chunk_hash,
-        "kv_rank": k.kv_rank,
-        "object_group_id": k.object_group_id,
-        "namespace": msgspec.to_builtins(k.namespace),
+        "identity": {
+            "chunk_hash": k.chunk_hash,
+            "model_name": k.model_name,
+            "kv_rank": k.kv_rank,
+            "object_group_id": k.object_group_id,
+            "cache_salt": k.cache_salt,
+            "tags": dict(k.identity.tags),
+        }
     }
 
 
 def _dec_object_key(d: dict[str, Any]) -> ObjectKey:
-    namespace = {
-        "model_name": d.get("model_name", ""),
-        "cache_salt": d.get("cache_salt", ""),
-        **d.get("namespace", {}),
-    }
+    fields = d.get("identity", d)
     return ObjectKey(
-        chunk_hash=d["chunk_hash"],
-        namespace=msgspec.convert(namespace, type=CacheNamespace),
-        kv_rank=d["kv_rank"],
-        object_group_id=d.get("object_group_id", 0),
+        identity=ObjectKeyIdentity(
+            chunk_hash=fields["chunk_hash"],
+            model_name=fields["model_name"],
+            kv_rank=fields["kv_rank"],
+            object_group_id=fields.get("object_group_id", 0),
+            cache_salt=fields.get("cache_salt", ""),
+            tags=fields.get("tags", {}),
+        )
     )
 
 

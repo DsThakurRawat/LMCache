@@ -15,7 +15,7 @@ import torch
 
 # First Party
 from lmcache import torch_dev, torch_device_type
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import (
     GroupedObjectKeys,
     MemoryLayoutDesc,
@@ -63,9 +63,11 @@ if not torch_dev.is_available():
 
 def make_object_key(chunk_id: int) -> ObjectKey:
     return ObjectKey(
-        chunk_hash=ObjectKey.IntHash2Bytes(chunk_id),
-        namespace=CacheNamespace(model_name="test_model"),
-        kv_rank=0,
+        identity=ObjectKeyIdentity(
+            model_name="test_model",
+            chunk_hash=ObjectKey.IntHash2Bytes(chunk_id),
+            kv_rank=0,
+        )
     )
 
 

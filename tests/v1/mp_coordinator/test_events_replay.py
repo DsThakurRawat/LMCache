@@ -21,7 +21,7 @@ import httpx
 import pytest
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import ObjectKey, Tier
 from lmcache.v1.mp_coordinator.api import (
     CACHE_EVENT_SCHEMA_VERSION,
@@ -59,9 +59,12 @@ def _reset_trace_gate():
 
 def _key(chunk: str) -> ObjectKey:
     return ObjectKey(
-        chunk_hash=bytes.fromhex(chunk),
-        namespace=CacheNamespace(model_name="m", cache_salt="alice"),
-        kv_rank=0,
+        identity=ObjectKeyIdentity(
+            model_name="m",
+            cache_salt="alice",
+            chunk_hash=bytes.fromhex(chunk),
+            kv_rank=0,
+        )
     )
 
 

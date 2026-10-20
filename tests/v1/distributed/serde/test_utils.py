@@ -2,17 +2,20 @@
 """Unit tests for ``lmcache.v1.distributed.serde.utils``."""
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import ObjectKey
 from lmcache.v1.distributed.serde.utils import make_temp_key
 
 
 def _orig(salt: str = "", object_group_id: int = 0) -> ObjectKey:
     return ObjectKey(
-        chunk_hash=b"\x00" * 16,
-        namespace=CacheNamespace(model_name="model", cache_salt=salt),
-        kv_rank=0,
-        object_group_id=object_group_id,
+        identity=ObjectKeyIdentity(
+            model_name="model",
+            cache_salt=salt,
+            chunk_hash=b"\x00" * 16,
+            kv_rank=0,
+            object_group_id=object_group_id,
+        )
     )
 
 

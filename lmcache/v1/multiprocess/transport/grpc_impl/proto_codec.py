@@ -364,7 +364,13 @@ def compile_request_codec_for_types(
         TypeError: If the protobuf request cannot represent the payload types.
     """
     proto_fields = tuple(message_cls.DESCRIPTOR.fields)
-    if len(payload_types) == len(proto_fields):
+    py_fields = (
+        _structured_fields(payload_types[0]) if len(payload_types) == 1 else None
+    )
+    structured_payload = py_fields is not None and tuple(
+        name for name, _ in py_fields
+    ) == tuple(field.name for field in proto_fields)
+    if len(payload_types) == len(proto_fields) and not structured_payload:
         codecs = tuple(
             _compile_field_codec(field, py_type)
             for field, py_type in zip(proto_fields, payload_types, strict=True)

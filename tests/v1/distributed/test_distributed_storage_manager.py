@@ -12,7 +12,7 @@ import torch
 
 # First Party
 from lmcache import torch_dev, torch_device_type
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import (
     GroupedObjectKeys,
     MemoryLayoutDesc,
@@ -144,9 +144,9 @@ def make_object_key(chunk_hash: int, model_name: str = "test_model", kv_rank: in
     """Helper to create ObjectKey instances."""
     hash_bytes = ObjectKey.IntHash2Bytes(chunk_hash)
     return ObjectKey(
-        chunk_hash=hash_bytes,
-        namespace=CacheNamespace(model_name=model_name),
-        kv_rank=kv_rank,
+        identity=ObjectKeyIdentity(
+            model_name=model_name, chunk_hash=hash_bytes, kv_rank=kv_rank
+        )
     )
 
 

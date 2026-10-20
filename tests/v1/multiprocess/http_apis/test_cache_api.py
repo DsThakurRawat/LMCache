@@ -19,7 +19,7 @@ import pytest
 
 # First Party
 from lmcache.lmcache_native import Bitmap
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import (
     DEFAULT_ATTN_WINDOW_DESC,
     AttnWindowDesc,
@@ -143,22 +143,22 @@ class TestDeleteObjectsEndpoint:
             json={
                 "keys": [
                     {
-                        "chunk_hash_hex": _hex(1),
-                        "kv_rank": 0,
-                        "namespace": {
+                        "identity": {
                             "model_name": "llama",
                             "cache_salt": "alice",
                             "tags": {},
-                        },
+                            "chunk_hash_hex": _hex(1),
+                            "kv_rank": 0,
+                        }
                     },
                     {
-                        "chunk_hash_hex": _hex(2),
-                        "kv_rank": 0,
-                        "namespace": {
+                        "identity": {
                             "model_name": "llama",
                             "cache_salt": "",
                             "tags": {},
-                        },
+                            "chunk_hash_hex": _hex(2),
+                            "kv_rank": 0,
+                        }
                     },
                 ],
             },
@@ -171,9 +171,12 @@ class TestDeleteObjectsEndpoint:
         assert secondary.delete_calls == []
         forwarded = primary.delete_calls[0]
         assert forwarded[0] == ObjectKey(
-            chunk_hash=b"\x00\x00\x00\x01",
-            namespace=CacheNamespace(model_name="llama", cache_salt="alice"),
-            kv_rank=0,
+            identity=ObjectKeyIdentity(
+                model_name="llama",
+                cache_salt="alice",
+                chunk_hash=b"\x00\x00\x00\x01",
+                kv_rank=0,
+            )
         )
         assert forwarded[1].cache_salt == ""
 
@@ -190,13 +193,13 @@ class TestDeleteObjectsEndpoint:
                 "adapter": "fs",
                 "keys": [
                     {
-                        "chunk_hash_hex": _hex(1),
-                        "kv_rank": 0,
-                        "namespace": {
+                        "identity": {
                             "model_name": "m",
                             "cache_salt": "",
                             "tags": {},
-                        },
+                            "chunk_hash_hex": _hex(1),
+                            "kv_rank": 0,
+                        }
                     }
                 ],
             },
@@ -235,13 +238,13 @@ class TestDeleteObjectsEndpoint:
                 "tier": "l1",
                 "keys": [
                     {
-                        "chunk_hash_hex": _hex(1),
-                        "kv_rank": 0,
-                        "namespace": {
+                        "identity": {
                             "model_name": "m",
                             "cache_salt": "",
                             "tags": {},
-                        },
+                            "chunk_hash_hex": _hex(1),
+                            "kv_rank": 0,
+                        }
                     }
                 ],
             },
@@ -264,13 +267,13 @@ class TestDeleteObjectsEndpoint:
                 "force": True,
                 "keys": [
                     {
-                        "chunk_hash_hex": _hex(1),
-                        "kv_rank": 0,
-                        "namespace": {
+                        "identity": {
                             "model_name": "m",
                             "cache_salt": "",
                             "tags": {},
-                        },
+                            "chunk_hash_hex": _hex(1),
+                            "kv_rank": 0,
+                        }
                     }
                 ],
             },
@@ -292,13 +295,13 @@ class TestDeleteObjectsEndpoint:
                 "tier": "l1",
                 "keys": [
                     {
-                        "chunk_hash_hex": _hex(1),
-                        "kv_rank": 0,
-                        "namespace": {
+                        "identity": {
                             "model_name": "m",
                             "cache_salt": "",
                             "tags": {},
-                        },
+                            "chunk_hash_hex": _hex(1),
+                            "kv_rank": 0,
+                        }
                     }
                 ],
             },
@@ -330,13 +333,13 @@ class TestDeleteObjectsEndpoint:
             {
                 "keys": [
                     {
-                        "chunk_hash_hex": _hex(1),
-                        "kv_rank": "x",
-                        "namespace": {
+                        "identity": {
                             "model_name": "m",
                             "cache_salt": "",
                             "tags": {},
-                        },
+                            "chunk_hash_hex": _hex(1),
+                            "kv_rank": "x",
+                        }
                     }
                 ]
             },
@@ -364,9 +367,11 @@ class TestDeleteObjectsEndpoint:
                 {
                     "keys": [
                         {
-                            "chunk_hash_hex": "zz",
-                            "kv_rank": 0,
-                            "namespace": {"model_name": "m"},
+                            "identity": {
+                                "model_name": "m",
+                                "chunk_hash_hex": "zz",
+                                "kv_rank": 0,
+                            }
                         }
                     ]
                 },
@@ -376,9 +381,11 @@ class TestDeleteObjectsEndpoint:
                 {
                     "keys": [
                         {
-                            "chunk_hash_hex": _hex(1),
-                            "kv_rank": 0,
-                            "namespace": {"model_name": "bad@name"},
+                            "identity": {
+                                "model_name": "bad@name",
+                                "chunk_hash_hex": _hex(1),
+                                "kv_rank": 0,
+                            }
                         }
                     ]
                 },
@@ -398,13 +405,13 @@ class TestDeleteObjectsEndpoint:
         client = TestClient(_make_app(_sm_with(("s3", adapter))))
         oversized = [
             {
-                "chunk_hash_hex": _hex(i),
-                "kv_rank": 0,
-                "namespace": {
+                "identity": {
                     "model_name": "m",
                     "cache_salt": "",
                     "tags": {},
-                },
+                    "chunk_hash_hex": _hex(i),
+                    "kv_rank": 0,
+                }
             }
             for i in range(MAX_DELETE_BATCH + 1)
         ]
@@ -422,9 +429,12 @@ class TestDeleteObjectsEndpoint:
 class TestListObjectsEndpoint:
     def test_happy_path_defaults_to_primary(self):
         k1 = ObjectKey(
-            chunk_hash=b"\xde\xad\xbe\xef",
-            namespace=CacheNamespace(model_name="llama", cache_salt="alice"),
-            kv_rank=2,
+            identity=ObjectKeyIdentity(
+                model_name="llama",
+                cache_salt="alice",
+                chunk_hash=b"\xde\xad\xbe\xef",
+                kv_rank=2,
+            )
         )
         primary = _FakeAdapter(
             list_page=KeyListPage(
@@ -445,14 +455,14 @@ class TestListObjectsEndpoint:
         assert body["entries"] == [
             {
                 "key": {
-                    "chunk_hash_hex": "deadbeef",
-                    "kv_rank": 2,
-                    "object_group_id": 0,
-                    "namespace": {
+                    "identity": {
                         "model_name": "llama",
                         "cache_salt": "alice",
                         "tags": {},
-                    },
+                        "chunk_hash_hex": "deadbeef",
+                        "kv_rank": 2,
+                        "object_group_id": 0,
+                    }
                 },
                 "size_bytes": 4096,
             }

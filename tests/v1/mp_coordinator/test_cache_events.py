@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import (
     CapacitySnapshot,
     L1BackendType,
@@ -58,9 +58,9 @@ import lmcache.v1.mp_coordinator.cache_events as cache_events
 
 def _key(hash_byte: int) -> ObjectKey:
     return ObjectKey(
-        chunk_hash=bytes([hash_byte]) * 4,
-        namespace=CacheNamespace(model_name="m"),
-        kv_rank=0,
+        identity=ObjectKeyIdentity(
+            model_name="m", chunk_hash=bytes([hash_byte]) * 4, kv_rank=0
+        )
     )
 
 
@@ -210,9 +210,9 @@ def test_tokens_event_stamps_store_entries():
     subscriber = _subscriber(sink)
 
     rank1_key = ObjectKey(
-        chunk_hash=_key(1).chunk_hash,
-        namespace=CacheNamespace(model_name="m"),
-        kv_rank=1,
+        identity=ObjectKeyIdentity(
+            model_name="m", chunk_hash=_key(1).chunk_hash, kv_rank=1
+        )
     )
     _dispatch(
         subscriber,

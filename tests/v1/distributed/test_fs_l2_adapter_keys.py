@@ -12,7 +12,7 @@ appended as a trailing field when non-empty. Unsalted keys use the
 import pytest
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import ObjectKey
 from lmcache.v1.distributed.l2_adapters.fs_l2_adapter import (
     _filename_to_object_key,
@@ -36,10 +36,13 @@ class TestFilenameRoundtrip:
     @pytest.mark.parametrize("object_group_id", [0, 1, 255])
     def test_roundtrip(self, model_name: str, cache_salt: str, object_group_id: int):
         key = ObjectKey(
-            chunk_hash=b"\xde\xad\xbe\xef",
-            namespace=CacheNamespace(model_name=model_name, cache_salt=cache_salt),
-            kv_rank=42,
-            object_group_id=object_group_id,
+            identity=ObjectKeyIdentity(
+                model_name=model_name,
+                cache_salt=cache_salt,
+                chunk_hash=b"\xde\xad\xbe\xef",
+                kv_rank=42,
+                object_group_id=object_group_id,
+            )
         )
         fn = _object_key_to_filename(key)
         assert fn.endswith(".data")
@@ -53,18 +56,22 @@ class TestFilenameRoundtrip:
         """Keys differing only in object_group_id must not collide."""
         fn0 = _object_key_to_filename(
             ObjectKey(
-                chunk_hash=b"\xde\xad\xbe\xef",
-                namespace=CacheNamespace(model_name="llama"),
-                kv_rank=42,
-                object_group_id=0,
+                identity=ObjectKeyIdentity(
+                    model_name="llama",
+                    chunk_hash=b"\xde\xad\xbe\xef",
+                    kv_rank=42,
+                    object_group_id=0,
+                )
             )
         )
         fn1 = _object_key_to_filename(
             ObjectKey(
-                chunk_hash=b"\xde\xad\xbe\xef",
-                namespace=CacheNamespace(model_name="llama"),
-                kv_rank=42,
-                object_group_id=1,
+                identity=ObjectKeyIdentity(
+                    model_name="llama",
+                    chunk_hash=b"\xde\xad\xbe\xef",
+                    kv_rank=42,
+                    object_group_id=1,
+                )
             )
         )
         assert fn0 != fn1
@@ -74,10 +81,13 @@ class TestFilenameRoundtrip:
         fn = "llama@0x0000002a@0@deadbeef.data"
         parsed = _filename_to_object_key(fn)
         assert parsed == ObjectKey(
-            chunk_hash=b"\xde\xad\xbe\xef",
-            namespace=CacheNamespace(model_name="llama", cache_salt=""),
-            kv_rank=42,
-            object_group_id=0,
+            identity=ObjectKeyIdentity(
+                model_name="llama",
+                cache_salt="",
+                chunk_hash=b"\xde\xad\xbe\xef",
+                kv_rank=42,
+                object_group_id=0,
+            )
         )
 
     def test_salted_format(self):
@@ -85,10 +95,13 @@ class TestFilenameRoundtrip:
         fn = "llama@0x0000002a@2@deadbeef@alice.data"
         parsed = _filename_to_object_key(fn)
         assert parsed == ObjectKey(
-            chunk_hash=b"\xde\xad\xbe\xef",
-            namespace=CacheNamespace(model_name="llama", cache_salt="alice"),
-            kv_rank=42,
-            object_group_id=2,
+            identity=ObjectKeyIdentity(
+                model_name="llama",
+                cache_salt="alice",
+                chunk_hash=b"\xde\xad\xbe\xef",
+                kv_rank=42,
+                object_group_id=2,
+            )
         )
 
     def test_non_data_file_returns_none(self):
@@ -228,10 +241,12 @@ class TestObjectKeyValidation:
     def test_negative_object_group_id_rejected(self):
         with pytest.raises(ValueError, match="object_group_id"):
             ObjectKey(
-                chunk_hash=b"\xde\xad\xbe\xef",
-                namespace=CacheNamespace(model_name="llama"),
-                kv_rank=0,
-                object_group_id=-1,
+                identity=ObjectKeyIdentity(
+                    model_name="llama",
+                    chunk_hash=b"\xde\xad\xbe\xef",
+                    kv_rank=0,
+                    object_group_id=-1,
+                )
             )
 
 
@@ -279,8 +294,8 @@ class TestIPCCacheServerKeyCacheSalt:
         assert k2.worker_id is None
         assert k2.cache_salt == "alice"
 
-    def test_wire_namespace_defaults_salt(self):
-        """An omitted namespace salt defaults to the unisolated namespace."""
+    def test_wire_identity_defaults_salt(self):
+        """An omitted identity salt defaults to the unisolated namespace."""
         # Third Party
         import msgspec
 
@@ -288,12 +303,14 @@ class TestIPCCacheServerKeyCacheSalt:
         from lmcache.v1.multiprocess.custom_types import IPCCacheServerKey
 
         payload = {
-            "namespace": {"model_name": "m"},
-            "world_size": 1,
-            "worker_id": 0,
-            "token_ids": (1, 2),
-            "start": 0,
-            "end": 2,
+            "identity": {
+                "model_name": "m",
+                "world_size": 1,
+                "worker_id": 0,
+                "token_ids": (1, 2),
+                "start": 0,
+                "end": 2,
+            },
             "request_id": "r1",
         }
         wire = msgspec.msgpack.encode(payload)

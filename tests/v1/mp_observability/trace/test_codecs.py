@@ -7,7 +7,7 @@ import pytest
 import torch
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import (
     AttnWindowDesc,
     GroupedObjectKeys,
@@ -51,19 +51,21 @@ class TestPrimitives:
 class TestObjectKey:
     def test_roundtrip(self):
         k = ObjectKey(
-            chunk_hash=b"\x00\x01\x02",
-            namespace=CacheNamespace(model_name="m"),
-            kv_rank=42,
+            identity=ObjectKeyIdentity(
+                model_name="m", chunk_hash=b"\x00\x01\x02", kv_rank=42
+            )
         )
         out = _roundtrip(k)
         assert out == k
 
     def test_object_group_id_roundtrip(self):
         k = ObjectKey(
-            chunk_hash=b"\x00\x01\x02",
-            namespace=CacheNamespace(model_name="m"),
-            kv_rank=42,
-            object_group_id=7,
+            identity=ObjectKeyIdentity(
+                model_name="m",
+                chunk_hash=b"\x00\x01\x02",
+                kv_rank=42,
+                object_group_id=7,
+            )
         )
         out = _roundtrip(k)
         assert out == k
@@ -72,10 +74,10 @@ class TestObjectKey:
     def test_inside_list(self):
         keys = [
             ObjectKey(
-                chunk_hash=b"a", namespace=CacheNamespace(model_name="m"), kv_rank=1
+                identity=ObjectKeyIdentity(model_name="m", chunk_hash=b"a", kv_rank=1)
             ),
             ObjectKey(
-                chunk_hash=b"b", namespace=CacheNamespace(model_name="m"), kv_rank=2
+                identity=ObjectKeyIdentity(model_name="m", chunk_hash=b"b", kv_rank=2)
             ),
         ]
         assert _roundtrip(keys) == keys
@@ -121,10 +123,12 @@ def _grouped_object_keys(gid: int, window: int = -1) -> GroupedObjectKeys:
     return GroupedObjectKeys(
         keys=[
             ObjectKey(
-                chunk_hash=bytes([i]),
-                namespace=CacheNamespace(model_name="m"),
-                kv_rank=1,
-                object_group_id=gid,
+                identity=ObjectKeyIdentity(
+                    model_name="m",
+                    chunk_hash=bytes([i]),
+                    kv_rank=1,
+                    object_group_id=gid,
+                )
             )
             for i in range(3)
         ],
@@ -192,10 +196,10 @@ class TestSet:
     def test_roundtrip(self):
         keys = {
             ObjectKey(
-                chunk_hash=b"a", namespace=CacheNamespace(model_name="m"), kv_rank=1
+                identity=ObjectKeyIdentity(model_name="m", chunk_hash=b"a", kv_rank=1)
             ),
             ObjectKey(
-                chunk_hash=b"b", namespace=CacheNamespace(model_name="m"), kv_rank=2
+                identity=ObjectKeyIdentity(model_name="m", chunk_hash=b"b", kv_rank=2)
             ),
         }
         out = _roundtrip(keys)
@@ -233,7 +237,9 @@ class TestEncodeArgs:
         args = {
             "keys": [
                 ObjectKey(
-                    chunk_hash=b"x", namespace=CacheNamespace(model_name="m"), kv_rank=0
+                    identity=ObjectKeyIdentity(
+                        model_name="m", chunk_hash=b"x", kv_rank=0
+                    )
                 )
             ],
             "mode": "new",

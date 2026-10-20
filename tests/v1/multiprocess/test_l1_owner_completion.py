@@ -13,7 +13,7 @@ import pytest
 import torch
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.config import (
     EvictionConfig,
@@ -115,10 +115,9 @@ def test_store_owner_callback_round_trip(
     monkeypatch.setattr(transfer, "transfer_kv_per_object_group", copy)
     keys = [
         ObjectKey(
-            chunk_hash=b"chunk",
-            namespace=CacheNamespace(model_name="model"),
-            kv_rank=0,
-            object_group_id=gid,
+            identity=ObjectKeyIdentity(
+                model_name="model", chunk_hash=b"chunk", kv_rank=0, object_group_id=gid
+            )
         )
         for gid in range(2)
     ]

@@ -20,7 +20,7 @@ import pytest
 import torch
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 
 # ---------------------------------------------------------------------------
 # In-process fake `glide_sync`
@@ -244,9 +244,12 @@ def create_object_key(
     cache_salt: str = "",
 ) -> ObjectKey:
     return ObjectKey(
-        chunk_hash=ObjectKey.IntHash2Bytes(chunk_id),
-        namespace=CacheNamespace(model_name=model_name, cache_salt=cache_salt),
-        kv_rank=0,
+        identity=ObjectKeyIdentity(
+            model_name=model_name,
+            cache_salt=cache_salt,
+            chunk_hash=ObjectKey.IntHash2Bytes(chunk_id),
+            kv_rank=0,
+        )
     )
 
 

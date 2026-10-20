@@ -12,16 +12,10 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class ObjectKey(_message.Message):
-    __slots__ = ("chunk_hash", "namespace", "kv_rank", "object_group_id")
-    CHUNK_HASH_FIELD_NUMBER: _ClassVar[int]
-    NAMESPACE_FIELD_NUMBER: _ClassVar[int]
-    KV_RANK_FIELD_NUMBER: _ClassVar[int]
-    OBJECT_GROUP_ID_FIELD_NUMBER: _ClassVar[int]
-    chunk_hash: bytes
-    namespace: _common_pb2.CacheNamespace
-    kv_rank: int
-    object_group_id: int
-    def __init__(self, chunk_hash: _Optional[bytes] = ..., namespace: _Optional[_Union[_common_pb2.CacheNamespace, _Mapping]] = ..., kv_rank: _Optional[int] = ..., object_group_id: _Optional[int] = ...) -> None: ...
+    __slots__ = ("identity",)
+    IDENTITY_FIELD_NUMBER: _ClassVar[int]
+    identity: _common_pb2.ObjectKeyIdentity
+    def __init__(self, identity: _Optional[_Union[_common_pb2.ObjectKeyIdentity, _Mapping]] = ...) -> None: ...
 
 class TensorShape(_message.Message):
     __slots__ = ("dims",)

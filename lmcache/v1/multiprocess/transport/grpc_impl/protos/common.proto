@@ -6,24 +6,31 @@ syntax = "proto3";
 
 package lmcache.mp;
 
-message CacheNamespace {
+message IPCKeyIdentity {
+  int64 world_size = 1;
+  optional int64 worker_id = 2;
+  repeated int64 token_ids = 3;
+  int64 start = 4;
+  int64 end = 5;
+  string model_name = 6;
+  string cache_salt = 7;
+  map<string, string> tags = 8;
+}
+
+message ObjectKeyIdentity {
+  bytes chunk_hash = 1;
+  int64 kv_rank = 2;
   string model_name = 3;
-  string cache_salt = 4;
-  reserved 1;
-  reserved "kv_encoding";
-  map<string, string> tags = 2;
+  int64 object_group_id = 4;
+  string cache_salt = 5;
+  map<string, string> tags = 6;
 }
 
 // Cache key used by engine and CacheBlend RPCs.
 message IpcCacheServerKey {
-  reserved 1, 8;
-  reserved "model_name", "cache_salt";
-  CacheNamespace namespace = 11;
-  int64 world_size = 2;
-  optional int64 worker_id = 3;
-  repeated int64 token_ids = 4;
-  int64 start = 5;
-  int64 end = 6;
+  reserved 1, 2, 3, 4, 5, 6, 8, 11;
+  reserved "model_name", "world_size", "worker_id", "token_ids", "start", "end", "cache_salt", "namespace";
+  IPCKeyIdentity identity = 12;
   string request_id = 7;
   optional bytes encoded_request_configs = 9;
   int64 num_kv_readers = 10;

@@ -18,7 +18,7 @@ import pytest
 import torch
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.internal_api import L1MemoryDesc
 from lmcache.v1.distributed.l2_adapters import create_l2_adapter
@@ -244,22 +244,29 @@ def test_posix_public_batch_round_trip_persistence_and_delete(
     _, arena = _aligned_arena(6 * _CHUNK_SIZE)
     keys = [
         ObjectKey(
-            chunk_hash=bytes.fromhex("00112233"),
-            namespace=CacheNamespace(model_name="org/model", cache_salt="tenant"),
-            kv_rank=42,
-            object_group_id=7,
+            identity=ObjectKeyIdentity(
+                model_name="org/model",
+                cache_salt="tenant",
+                chunk_hash=bytes.fromhex("00112233"),
+                kv_rank=42,
+                object_group_id=7,
+            )
         ),
         ObjectKey(
-            chunk_hash=bytes.fromhex("44556677"),
-            namespace=CacheNamespace(model_name="org/model"),
-            kv_rank=42,
-            object_group_id=8,
+            identity=ObjectKeyIdentity(
+                model_name="org/model",
+                chunk_hash=bytes.fromhex("44556677"),
+                kv_rank=42,
+                object_group_id=8,
+            )
         ),
         ObjectKey(
-            chunk_hash=bytes.fromhex("8899aabb"),
-            namespace=CacheNamespace(model_name="org/model"),
-            kv_rank=42,
-            object_group_id=9,
+            identity=ObjectKeyIdentity(
+                model_name="org/model",
+                chunk_hash=bytes.fromhex("8899aabb"),
+                kv_rank=42,
+                object_group_id=9,
+            )
         ),
     ]
     sources: list[MemoryObj] = [
@@ -341,19 +348,19 @@ def test_posix_rejects_out_of_arena_and_accepts_unaligned_buffered_io(
     )
     keys = [
         ObjectKey(
-            chunk_hash=ObjectKey.IntHash2Bytes(1),
-            namespace=CacheNamespace(model_name="model"),
-            kv_rank=0,
+            identity=ObjectKeyIdentity(
+                model_name="model", chunk_hash=ObjectKey.IntHash2Bytes(1), kv_rank=0
+            )
         ),
         ObjectKey(
-            chunk_hash=ObjectKey.IntHash2Bytes(2),
-            namespace=CacheNamespace(model_name="model"),
-            kv_rank=0,
+            identity=ObjectKeyIdentity(
+                model_name="model", chunk_hash=ObjectKey.IntHash2Bytes(2), kv_rank=0
+            )
         ),
         ObjectKey(
-            chunk_hash=ObjectKey.IntHash2Bytes(3),
-            namespace=CacheNamespace(model_name="model"),
-            kv_rank=0,
+            identity=ObjectKeyIdentity(
+                model_name="model", chunk_hash=ObjectKey.IntHash2Bytes(3), kv_rank=0
+            )
         ),
     ]
 
@@ -391,10 +398,12 @@ def test_posix_repeated_round_trips_release_file_descriptors(
     _, arena = _aligned_arena(4 * _CHUNK_SIZE)
     keys = [
         ObjectKey(
-            chunk_hash=ObjectKey.IntHash2Bytes(index),
-            namespace=CacheNamespace(model_name="fd/model"),
-            kv_rank=1,
-            object_group_id=index,
+            identity=ObjectKeyIdentity(
+                model_name="fd/model",
+                chunk_hash=ObjectKey.IntHash2Bytes(index),
+                kv_rank=1,
+                object_group_id=index,
+            )
         )
         for index in range(1, 3)
     ]
@@ -444,10 +453,12 @@ def test_posix_concurrent_thread_atomic_publication(tmp_path: Path) -> None:
     """Publish one complete file from concurrent threads sharing an adapter."""
     _, arena = _aligned_arena(2 * _CHUNK_SIZE)
     key = ObjectKey(
-        chunk_hash=ObjectKey.IntHash2Bytes(77),
-        namespace=CacheNamespace(model_name="shared/model"),
-        kv_rank=3,
-        object_group_id=5,
+        identity=ObjectKeyIdentity(
+            model_name="shared/model",
+            chunk_hash=ObjectKey.IntHash2Bytes(77),
+            kv_rank=3,
+            object_group_id=5,
+        )
     )
     fill_values = (71, 83)
     sources: list[MemoryObj] = [
@@ -517,10 +528,12 @@ def test_posix_direct_io_batch_round_trip(tmp_path: Path) -> None:
     _, arena = _aligned_arena(4 * _CHUNK_SIZE)
     keys = [
         ObjectKey(
-            chunk_hash=ObjectKey.IntHash2Bytes(index),
-            namespace=CacheNamespace(model_name="direct/model"),
-            kv_rank=2,
-            object_group_id=index,
+            identity=ObjectKeyIdentity(
+                model_name="direct/model",
+                chunk_hash=ObjectKey.IntHash2Bytes(index),
+                kv_rank=2,
+                object_group_id=index,
+            )
         )
         for index in range(1, 3)
     ]
@@ -800,18 +813,21 @@ def test_object_public_round_trip_and_capabilities() -> None:
     _, arena = _aligned_arena(4 * _CHUNK_SIZE)
     keys = [
         ObjectKey(
-            chunk_hash=bytes.fromhex("00112233"),
-            namespace=CacheNamespace(
-                model_name="lmcache/nixl-native-integration", cache_salt="tenant"
-            ),
-            kv_rank=42,
-            object_group_id=7,
+            identity=ObjectKeyIdentity(
+                model_name="lmcache/nixl-native-integration",
+                cache_salt="tenant",
+                chunk_hash=bytes.fromhex("00112233"),
+                kv_rank=42,
+                object_group_id=7,
+            )
         ),
         ObjectKey(
-            chunk_hash=bytes.fromhex("44556677"),
-            namespace=CacheNamespace(model_name="lmcache/nixl-native-integration"),
-            kv_rank=42,
-            object_group_id=8,
+            identity=ObjectKeyIdentity(
+                model_name="lmcache/nixl-native-integration",
+                chunk_hash=bytes.fromhex("44556677"),
+                kv_rank=42,
+                object_group_id=8,
+            )
         ),
     ]
     sources: list[MemoryObj] = [
@@ -849,10 +865,12 @@ def test_object_public_round_trip_and_capabilities() -> None:
         assert adapter.pop_completed_store_tasks()[store_id].is_successful()
 
         missing = ObjectKey(
-            chunk_hash=uuid.uuid4().bytes,
-            namespace=CacheNamespace(model_name="lmcache/nixl-native-missing"),
-            kv_rank=42,
-            object_group_id=9,
+            identity=ObjectKeyIdentity(
+                model_name="lmcache/nixl-native-missing",
+                chunk_hash=uuid.uuid4().bytes,
+                kv_rank=42,
+                object_group_id=9,
+            )
         )
         lookup_id = adapter.submit_lookup_and_lock_task(
             [*keys, missing], {0: _EMPTY_LAYOUT}

@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Standard
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable
 
@@ -8,7 +9,7 @@ import msgspec
 import torch
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import IPCKeyIdentity
 from lmcache.v1.platform.base.ipc_wrapper import (  # noqa: E402,F401
     DeviceIPCWrapper,
 )
@@ -39,13 +40,7 @@ class IPCCacheServerKey:
     request_ids are considered equal for cache purposes).
     """
 
-    namespace: CacheNamespace
-    world_size: int
-    worker_id: int | None
-
-    token_ids: tuple[int, ...]  # frozen tuple for hashability
-    start: int
-    end: int
+    identity: IPCKeyIdentity
 
     # === Session tracking (not part of cache identity) ===
     request_id: str = field(compare=False)
@@ -61,13 +56,38 @@ class IPCCacheServerKey:
 
     @property
     def model_name(self) -> str:
-        """Model identity, owned by the namespace."""
-        return self.namespace.model_name
+        """Read model_name from the identity."""
+        return self.identity.model_name
 
     @property
     def cache_salt(self) -> str:
-        """Isolation salt, owned by the namespace."""
-        return self.namespace.cache_salt
+        """Read cache_salt from the identity."""
+        return self.identity.cache_salt
+
+    @property
+    def world_size(self) -> int:
+        """Read world_size from the identity."""
+        return self.identity.world_size
+
+    @property
+    def worker_id(self) -> int | None:
+        """Read worker_id from the identity."""
+        return self.identity.worker_id
+
+    @property
+    def token_ids(self) -> tuple[int, ...]:
+        """Read token_ids from the identity."""
+        return self.identity.token_ids
+
+    @property
+    def start(self) -> int:
+        """Read start from the identity."""
+        return self.identity.start
+
+    @property
+    def end(self) -> int:
+        """Read end from the identity."""
+        return self.identity.end
 
     # Helper function for unit tests only
     @classmethod
@@ -83,22 +103,22 @@ class IPCCacheServerKey:
         cache_salt: str = "",
         num_kv_readers: int = 1,
         request_configs: dict[str, Any] | None = None,
-        namespace: CacheNamespace | None = None,
+        tags: Mapping[str, str] | None = None,
     ) -> "IPCCacheServerKey":
         """Create a key from token ids. Only used by the tests."""
         return cls(
-            world_size=world_size,
-            worker_id=worker_id,
             num_kv_readers=num_kv_readers,
-            token_ids=tuple(token_ids),
-            start=start,
-            end=end,
             request_id=request_id,
             request_configs=request_configs,
-            namespace=(
-                CacheNamespace(model_name=model_name, cache_salt=cache_salt)
-                if namespace is None
-                else replace(namespace, model_name=model_name, cache_salt=cache_salt)
+            identity=IPCKeyIdentity(
+                world_size=world_size,
+                worker_id=worker_id,
+                token_ids=tuple(token_ids),
+                start=start,
+                end=end,
+                model_name=model_name,
+                cache_salt=cache_salt,
+                tags=tags if tags is not None else {},
             ),
         )
 
@@ -121,17 +141,7 @@ class IPCCacheServerKey:
 
     def no_worker_id_version(self) -> "IPCCacheServerKey":
         """Create a copy with worker_id=None for lookup requests."""
-        return IPCCacheServerKey(
-            namespace=self.namespace,
-            world_size=self.world_size,
-            worker_id=None,
-            token_ids=self.token_ids,
-            start=self.start,
-            end=self.end,
-            request_id=self.request_id,
-            request_configs=self.request_configs,
-            num_kv_readers=self.num_kv_readers,
-        )
+        return replace(self, identity=replace(self.identity, worker_id=None))
 
 
 # Type exports

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Recovery and backend key naming preserve cache namespaces."""
+"""Recovery and backend key naming preserve complete cache identities."""
 
 # Standard
 from dataclasses import replace
@@ -11,7 +11,7 @@ import subprocess
 import pytest
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import ObjectKey
 from lmcache.v1.distributed.l2_adapters.bigtable_key_encoder import BigtableL2KeyEncoder
 from lmcache.v1.distributed.l2_adapters.fs_l2_adapter import (
@@ -34,16 +34,19 @@ from lmcache.v1.mp_observability.trace.codecs import decode_value, encode_value
 @pytest.mark.parametrize("salt", ["", "tenant"])
 def test_backend_names_recovery_and_trace(salt: str) -> None:
     key = ObjectKey(
-        chunk_hash=b"1234",
-        namespace=CacheNamespace(
+        identity=ObjectKeyIdentity(
             model_name="org/model",
             tags={"v": "1"},
             cache_salt=salt,
-        ),
-        kv_rank=1,
+            chunk_hash=b"1234",
+            kv_rank=1,
+        )
     )
     other = replace(
-        key, namespace=CacheNamespace(model_name="model", tags={"dtype": "fp8"})
+        key,
+        identity=ObjectKeyIdentity(
+            chunk_hash=b"1234", kv_rank=1, model_name="model", tags={"dtype": "fp8"}
+        ),
     )
     for encode in (
         _object_key_to_filename,
@@ -58,20 +61,20 @@ def test_backend_names_recovery_and_trace(salt: str) -> None:
         _string_to_object_key(s3_name(key)),
     ):
         assert recovered == key
-        assert recovered.namespace == key.namespace
+        assert recovered.identity == key.identity
     temp = make_temp_key(key)
-    assert temp.namespace == key.namespace
+    assert replace(temp.identity, chunk_hash=key.chunk_hash) == key.identity
     assert temp.chunk_hash != key.chunk_hash
     traced = decode_value(encode_value(key))
     assert traced == key
-    assert traced.namespace == key.namespace
+    assert traced.identity == key.identity
 
 
-def test_fs_rejects_invalid_or_overlong_namespace() -> None:
+def test_fs_rejects_invalid_or_overlong_identity() -> None:
     key = ObjectKey(
-        chunk_hash=b"1234",
-        namespace=CacheNamespace(model_name="model", tags={"large": "a" * 200}),
-        kv_rank=1,
+        identity=ObjectKeyIdentity(
+            model_name="model", tags={"large": "a" * 200}, chunk_hash=b"1234", kv_rank=1
+        )
     )
     with pytest.raises(ValueError, match="NAME_MAX"):
         _object_key_to_filename(key)
@@ -103,14 +106,21 @@ int main(int argc, char** argv) {
         capture_output=True,
     )
     for salt in ("", "tenant"):
-        for namespace in (
-            CacheNamespace(model_name="model"),
-            CacheNamespace(model_name="model", tags={"dtype": "bf16"}),
+        for identity in (
+            ObjectKeyIdentity(chunk_hash=b"1234", kv_rank=1, model_name="model"),
+            ObjectKeyIdentity(
+                chunk_hash=b"1234",
+                kv_rank=1,
+                model_name="model",
+                tags={"dtype": "bf16"},
+            ),
         ):
             key = ObjectKey(
-                chunk_hash=b"1234",
-                namespace=replace(namespace, model_name="org/model", cache_salt=salt),
-                kv_rank=1,
+                identity=replace(
+                    replace(identity, model_name="org/model", cache_salt=salt),
+                    chunk_hash=b"1234",
+                    kv_rank=1,
+                )
             )
             wire = _object_key_to_string(key)
             result = subprocess.check_output(
@@ -121,14 +131,17 @@ int main(int argc, char** argv) {
 
 def test_bigtable_extended_unsalted_cannot_alias_legacy_salt() -> None:
     extended = ObjectKey(
-        chunk_hash=b"1234",
-        namespace=CacheNamespace(model_name="model", tags={"dtype": "bf16"}),
-        kv_rank=1,
+        identity=ObjectKeyIdentity(
+            model_name="model", tags={"dtype": "bf16"}, chunk_hash=b"1234", kv_rank=1
+        )
     )
     legacy = replace(
         extended,
-        namespace=CacheNamespace(
-            model_name="model", cache_salt=extended.namespace.to_token()
+        identity=ObjectKeyIdentity(
+            chunk_hash=b"1234",
+            kv_rank=1,
+            model_name="model",
+            cache_salt=extended.identity.tags_token(),
         ),
     )
     encoder = BigtableL2KeyEncoder()

@@ -19,7 +19,7 @@ import torch
 
 # First Party
 from lmcache.lmcache_native import Bitmap
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import (
     FULL_ATTENTION_WINDOW_CHUNKS,
     FetchingPolicy,
@@ -58,10 +58,12 @@ def _group(num_keys: int, gid: int = 0, window: int = FULL) -> GroupedObjectKeys
     """Build one key group of ``num_keys`` chunk-ordered keys."""
     keys = [
         ObjectKey(
-            chunk_hash=ObjectKey.IntHash2Bytes(i),
-            namespace=CacheNamespace(model_name="m"),
-            kv_rank=0,
-            object_group_id=gid,
+            identity=ObjectKeyIdentity(
+                model_name="m",
+                chunk_hash=ObjectKey.IntHash2Bytes(i),
+                kv_rank=0,
+                object_group_id=gid,
+            )
         )
         for i in range(num_keys)
     ]

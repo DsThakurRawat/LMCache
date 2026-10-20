@@ -42,18 +42,18 @@ def _key(
     """A key shaped the way a server emits one: ``kv_rank`` packs the
     parallel setup the blend namespace is derived from."""
     return {
-        "chunk_hash_hex": h,
-        "kv_rank": ObjectKey.ComputeKVRank(
-            world_size=world_size,
-            global_rank=rank,
-            local_world_size=world_size,
-            local_rank=rank,
-        ),
-        "namespace": {
+        "identity": {
             "model_name": model,
             "cache_salt": salt,
             "tags": {},
-        },
+            "chunk_hash_hex": h,
+            "kv_rank": ObjectKey.ComputeKVRank(
+                world_size=world_size,
+                global_rank=rank,
+                local_world_size=world_size,
+                local_rank=rank,
+            ),
+        }
     }
 
 
@@ -101,7 +101,7 @@ def test_store_events_then_lookup():
 
         result = _lookup(client, [_key()])["results"]
         assert len(result) == 1
-        assert result[0]["key"]["chunk_hash_hex"] == "aa"
+        assert result[0]["key"]["identity"]["chunk_hash_hex"] == "aa"
         [placement] = result[0]["placements"]
         assert placement["instance_id"] == "node-a"
         assert placement["incarnation"] == 1
@@ -113,7 +113,7 @@ def test_store_events_then_lookup():
 def test_lookup_unknown_key_returns_empty_placements():
     with _client() as client:
         result = _lookup(client, [_key(h="ff")])["results"]
-        assert result[0]["key"]["chunk_hash_hex"] == "ff"
+        assert result[0]["key"]["identity"]["chunk_hash_hex"] == "ff"
         assert result[0]["placements"] == []
 
 
@@ -389,7 +389,9 @@ def test_list_keys_endpoint_filters_and_paginates():
 
         data = client.get("/directory/keys").json()
         assert data["total"] == 2
-        by_hash = {row["key"]["chunk_hash_hex"]: row for row in data["keys"]}
+        by_hash = {
+            row["key"]["identity"]["chunk_hash_hex"]: row for row in data["keys"]
+        }
         assert by_hash["aa"]["num_tokens"] == 2
         assert len(by_hash["aa"]["placements"]) == 2
         assert by_hash["bb"]["num_tokens"] == 0
@@ -449,7 +451,10 @@ def test_lookup_and_listing_report_access_counts():
         assert [r["access_count"] for r in results] == [2, 0, 0]
 
         listed = client.get("/directory/keys").json()["keys"]
-        by_hash = {row["key"]["chunk_hash_hex"]: row["access_count"] for row in listed}
+        by_hash = {
+            row["key"]["identity"]["chunk_hash_hex"]: row["access_count"]
+            for row in listed
+        }
         assert by_hash == {"aa": 2, "bb": 0}
 
 
@@ -539,7 +544,10 @@ def test_a_token_lookup_reports_every_object_group_it_is_stored_in():
     body = {"model_name": MODEL, "world_size": 1, "token_ids": [1, 2, 3, 4]}
     with TestClient(create_app(config)) as client:
         [group_zero] = client.post("/directory/lookup", json=body).json()["results"]
-        stored = [{**group_zero["key"], "object_group_id": g} for g in (0, 1, 2)]
+        stored = [
+            {"identity": {**group_zero["key"]["identity"], "object_group_id": g}}
+            for g in (0, 1, 2)
+        ]
         _post_events(
             client,
             [_batch(entries=[{"key": key, "size_bytes": 64} for key in stored])],
@@ -548,5 +556,7 @@ def test_a_token_lookup_reports_every_object_group_it_is_stored_in():
         results = client.post("/directory/lookup", json=body).json()
 
     assert results["chunks"] == 1
-    assert sorted(r["key"]["object_group_id"] for r in results["results"]) == [0, 1, 2]
+    assert sorted(
+        r["key"]["identity"]["object_group_id"] for r in results["results"]
+    ) == [0, 1, 2]
     assert all(r["placements"] for r in results["results"])

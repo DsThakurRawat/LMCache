@@ -512,7 +512,12 @@ class LookupModule(DiscoverableModule):
             obj_keys.extend(
                 resolve_prefetched_obj_keys(
                     self._ctx,
-                    replace(key, start=max(key.start, lock_floor)),
+                    replace(
+                        key,
+                        identity=replace(
+                            key.identity, start=max(key.start, lock_floor)
+                        ),
+                    ),
                     hit_chunks,
                     session.prefetch_locked_gids,
                 )
@@ -526,7 +531,12 @@ class LookupModule(DiscoverableModule):
             obj_keys.extend(
                 resolve_prefetched_obj_keys(
                     self._ctx,
-                    replace(key, start=range_start, end=range_end),
+                    replace(
+                        key,
+                        identity=replace(
+                            key.identity, start=range_start, end=range_end
+                        ),
+                    ),
                     range_end // self._ctx.chunk_size,
                     session.prefetch_locked_gids,
                 )

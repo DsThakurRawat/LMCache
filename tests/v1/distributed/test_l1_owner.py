@@ -10,7 +10,7 @@ import pytest
 import torch
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.config import L1ManagerConfig, L1MemoryManagerConfig
 from lmcache.v1.distributed.error import L1Error
@@ -59,9 +59,9 @@ def test_l1_reservation_owner_survives_prefetch_completion(
     first, second = managers
     assert first.l1_manager_id != second.l1_manager_id
     key = ObjectKey(
-        chunk_hash=ObjectKey.IntHash2Bytes(1),
-        namespace=CacheNamespace(model_name="owner-test"),
-        kv_rank=0,
+        identity=ObjectKeyIdentity(
+            model_name="owner-test", chunk_hash=ObjectKey.IntHash2Bytes(1), kv_rank=0
+        )
     )
     layout = MemoryLayoutDesc([torch.Size([64])], [torch.uint8])
     error, obj = first.reserve_write([key], [False], layout, tag="prefetch")[key]

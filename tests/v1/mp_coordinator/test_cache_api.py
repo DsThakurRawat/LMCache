@@ -232,14 +232,14 @@ def test_list_pins_shows_pinned_keys_with_counts():
         assert body["pins"] == [
             {
                 "key": {
-                    "chunk_hash_hex": k.chunk_hash.hex(),
-                    "kv_rank": k.kv_rank,
-                    "object_group_id": 0,
-                    "namespace": {
+                    "identity": {
                         "model_name": "m",
                         "cache_salt": "alice",
                         "tags": {},
-                    },
+                        "chunk_hash_hex": k.chunk_hash.hex(),
+                        "kv_rank": k.kv_rank,
+                        "object_group_id": 0,
+                    }
                 },
                 "pin_count": 2,
             }
@@ -265,7 +265,7 @@ def test_list_pins_filters_by_cache_salt_and_model():
 
         body = client.get("/cache/pins", params={"cache_salt": "bob"}).json()
         assert body["total"] == len(bob)
-        assert {p["key"]["namespace"]["cache_salt"] for p in body["pins"]} == {"bob"}
+        assert {p["key"]["identity"]["cache_salt"] for p in body["pins"]} == {"bob"}
 
         body = client.get("/cache/pins", params={"model_name": "m"}).json()
         assert body["total"] == len(alice) + len(bob)
@@ -287,7 +287,10 @@ def test_list_pins_pages_and_validates_bounds():
         first = client.get("/cache/pins", params={"offset": 0, "limit": 1}).json()
         second = client.get("/cache/pins", params={"offset": 1, "limit": 10}).json()
         assert first["total"] == second["total"] == len(expected)
-        listed = [p["key"]["chunk_hash_hex"] for p in first["pins"] + second["pins"]]
+        listed = [
+            p["key"]["identity"]["chunk_hash_hex"]
+            for p in first["pins"] + second["pins"]
+        ]
         assert listed == expected
 
         assert client.get("/cache/pins", params={"offset": -1}).status_code == 422
@@ -526,7 +529,11 @@ OTHER = [11, 12, 13, 14, 15, 16, 17, 18]
 def _keys_in_groups(ctx, tokens=TOKENS, salt="alice", groups=GROUPS):
     """The keys a fleet with separate object groups stores for ``tokens``."""
     keys, _ = resolve_object_keys(ctx.token_hasher, "m", 1, tokens, salt)
-    return [replace(key, object_group_id=g) for g in groups for key in keys]
+    return [
+        replace(key, identity=replace(key.identity, object_group_id=g))
+        for g in groups
+        for key in keys
+    ]
 
 
 def _store(ctx, keys, tier=Tier.L2, first_seq=1):
@@ -605,7 +612,7 @@ def test_a_pin_is_listed_once_per_chunk_not_once_per_group():
 
         assert pinned["affected"] == len(_resolve(ctx))
         assert listed["total"] == len(_resolve(ctx))
-        assert {p["key"]["object_group_id"] for p in listed["pins"]} == {0}
+        assert {p["key"]["identity"]["object_group_id"] for p in listed["pins"]} == {0}
 
 
 def test_a_model_without_separate_groups_pins_exactly_as_before():
@@ -637,7 +644,7 @@ def test_a_delete_reaches_every_object_group():
 
         assert resp.status_code == 200, resp.text
         [call] = deletes
-        assert {k["object_group_id"] for k in call["keys"]} == set(GROUPS)
+        assert {k["identity"]["object_group_id"] for k in call["keys"]} == set(GROUPS)
         assert len(call["keys"]) == len(keys)
 
 
@@ -652,7 +659,7 @@ def test_a_delete_sends_only_the_groups_the_chunk_is_stored_in():
         client.post("/cache/delete", json=_delete_body("mp-1", tier="l2"))
 
         [call] = deletes
-        assert {k["object_group_id"] for k in call["keys"]} == {0, 1}
+        assert {k["identity"]["object_group_id"] for k in call["keys"]} == {0, 1}
         assert len(call["keys"]) == 2 * len(_resolve(ctx))
 
 

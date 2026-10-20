@@ -22,7 +22,7 @@ import torch
 
 # First Party
 from lmcache.lmcache_native import Bitmap
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import KeyListPage, MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.config import L1ManagerConfig, L1MemoryManagerConfig
 from lmcache.v1.distributed.error import L1Error
@@ -52,9 +52,11 @@ WAIT_TIMEOUT_S = 5.0
 def make_key(index: int) -> ObjectKey:
     """Return a deterministic test key for ``index``."""
     return ObjectKey(
-        chunk_hash=ObjectKey.IntHash2Bytes(index),
-        namespace=CacheNamespace(model_name="serde-wrapper-test"),
-        kv_rank=0,
+        identity=ObjectKeyIdentity(
+            model_name="serde-wrapper-test",
+            chunk_hash=ObjectKey.IntHash2Bytes(index),
+            kv_rank=0,
+        )
     )
 
 

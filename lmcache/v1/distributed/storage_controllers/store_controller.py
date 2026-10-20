@@ -20,7 +20,6 @@ import weakref
 
 # First Party
 from lmcache.logging import init_logger
-from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import ObjectKey
 from lmcache.v1.distributed.error import L1Error
 from lmcache.v1.distributed.internal_api import L1ManagerInterface, L1ManagerListener
@@ -50,14 +49,21 @@ STORE_LOOP_POLL_TIMEOUT_MS = 500
 
 def _group_keys_by_shape(
     keys: list[ObjectKey],
-) -> dict[tuple[int, CacheNamespace], list[ObjectKey]]:
-    """Group by rank and namespace so each batch has one representation."""
+) -> dict[tuple[int, str, str, tuple[tuple[str, str], ...]], list[ObjectKey]]:
+    """Group compatible chunks by rank, model, isolation salt and tags."""
     groups: dict[
-        tuple[int, CacheNamespace],
+        tuple[int, str, str, tuple[tuple[str, str], ...]],
         list[ObjectKey],
     ] = defaultdict(list)
     for key in keys:
-        groups[(key.kv_rank, key.namespace)].append(key)
+        groups[
+            (
+                key.kv_rank,
+                key.model_name,
+                key.cache_salt,
+                tuple(key.identity.tags.items()),
+            )
+        ].append(key)
     return groups
 
 

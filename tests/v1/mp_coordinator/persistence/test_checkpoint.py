@@ -13,7 +13,7 @@ import time
 import pytest
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import ObjectKey, Tier
 from lmcache.v1.mp_coordinator.api import (
     CacheEventBatch,
@@ -69,9 +69,9 @@ class _Coordinator:
 
 def _key(chunk_id: int) -> ObjectKey:
     return ObjectKey(
-        chunk_hash=chunk_id.to_bytes(4, "big"),
-        namespace=CacheNamespace(model_name="m"),
-        kv_rank=0,
+        identity=ObjectKeyIdentity(
+            model_name="m", chunk_hash=chunk_id.to_bytes(4, "big"), kv_rank=0
+        )
     )
 
 

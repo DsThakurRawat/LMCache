@@ -9,7 +9,7 @@ import pytest
 import torch
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import IPCKeyIdentity, ObjectKeyIdentity
 from lmcache.v1.distributed.api import (
     AttnWindowDesc,
     GroupedObjectKeys,
@@ -28,10 +28,12 @@ LAYOUT = MemoryLayoutDesc(shapes=[torch.Size([2, 3])], dtypes=[torch.float16])
 def _keys(n: int, gid: int = 0, kv_rank: int = 0) -> list[ObjectKey]:
     return [
         ObjectKey(
-            chunk_hash=ObjectKey.IntHash2Bytes(i),
-            namespace=CacheNamespace(model_name="m"),
-            kv_rank=kv_rank,
-            object_group_id=gid,
+            identity=ObjectKeyIdentity(
+                model_name="m",
+                chunk_hash=ObjectKey.IntHash2Bytes(i),
+                kv_rank=kv_rank,
+                object_group_id=gid,
+            )
         )
         for i in range(n)
     ]
@@ -48,12 +50,15 @@ def _row(n: int, gid: int = 0, kv_rank: int = 0, window: int = -1) -> GroupedObj
 
 def _ipc_key(world_size: int, worker_id: int | None = None) -> IPCCacheServerKey:
     return IPCCacheServerKey(
-        namespace=CacheNamespace(model_name="m", cache_salt="salt"),
-        world_size=world_size,
-        worker_id=worker_id,
-        token_ids=(0,),
-        start=0,
-        end=0,
+        identity=IPCKeyIdentity(
+            model_name="m",
+            cache_salt="salt",
+            world_size=world_size,
+            worker_id=worker_id,
+            token_ids=(0,),
+            start=0,
+            end=0,
+        ),
         request_id="r",
     )
 

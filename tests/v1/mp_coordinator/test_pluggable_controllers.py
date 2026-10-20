@@ -597,13 +597,13 @@ def _post_batch(client: TestClient, incarnation: int, seq: int) -> None:
                     "entries": [
                         {
                             "key": {
-                                "chunk_hash_hex": f"{incarnation:02x}{seq:02x}",
-                                "kv_rank": 0,
-                                "namespace": {
+                                "identity": {
                                     "model_name": "m",
                                     "cache_salt": "",
                                     "tags": {},
-                                },
+                                    "chunk_hash_hex": f"{incarnation:02x}{seq:02x}",
+                                    "kv_rank": 0,
+                                }
                             },
                             "size_bytes": 1024,
                         }

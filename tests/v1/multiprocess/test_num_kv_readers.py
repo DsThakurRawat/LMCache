@@ -5,18 +5,20 @@
 import pytest
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import IPCKeyIdentity
 from lmcache.v1.multiprocess.custom_types import IPCCacheServerKey
 
 
 def _key(num_kv_readers: int) -> IPCCacheServerKey:
     return IPCCacheServerKey(
-        namespace=CacheNamespace(model_name="m"),
-        world_size=1,
-        worker_id=0,
-        token_ids=(1, 2, 3),
-        start=0,
-        end=3,
+        identity=IPCKeyIdentity(
+            model_name="m",
+            world_size=1,
+            worker_id=0,
+            token_ids=(1, 2, 3),
+            start=0,
+            end=3,
+        ),
         request_id="req",
         num_kv_readers=num_kv_readers,
     )

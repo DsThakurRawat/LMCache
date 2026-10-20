@@ -69,13 +69,13 @@ def _store_batch(instance_id: str, seq: int, tier: str, backend: str, h: str) ->
         "entries": [
             {
                 "key": {
-                    "chunk_hash_hex": h,
-                    "kv_rank": 0,
-                    "namespace": {
+                    "identity": {
                         "model_name": "m",
                         "cache_salt": "user-a",
                         "tags": {},
-                    },
+                        "chunk_hash_hex": h,
+                        "kv_rank": 0,
+                    }
                 },
                 "size_bytes": 1000,
             }

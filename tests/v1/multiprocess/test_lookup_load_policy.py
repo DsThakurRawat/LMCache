@@ -14,7 +14,7 @@ import time
 import pytest
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import IPCKeyIdentity
 from lmcache.v1.distributed.api import AttnWindowDesc, PrefetchHandle, PrefetchResult
 from lmcache.v1.mp_observability.event import EventType
 from lmcache.v1.multiprocess.config import (
@@ -72,12 +72,14 @@ def _ctx() -> MagicMock:
 
 def _key(request_configs: dict[str, Any] | None) -> IPCCacheServerKey:
     return IPCCacheServerKey(
-        namespace=CacheNamespace(model_name="m"),
-        world_size=1,
-        worker_id=None,
-        token_ids=tuple(range(len(CHUNK_HASHES) * CHUNK_SIZE)),
-        start=0,
-        end=len(CHUNK_HASHES) * CHUNK_SIZE,
+        identity=IPCKeyIdentity(
+            model_name="m",
+            world_size=1,
+            worker_id=None,
+            token_ids=tuple(range(len(CHUNK_HASHES) * CHUNK_SIZE)),
+            start=0,
+            end=len(CHUNK_HASHES) * CHUNK_SIZE,
+        ),
         request_id="req-1",
         request_configs=request_configs,
         num_kv_readers=1,

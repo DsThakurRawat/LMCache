@@ -17,7 +17,7 @@ from lmcache.cli.commands.trace.replay_events_command import (
     ReplayEventsCommand,
     run_events_replay,
 )
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import ObjectKey, Tier
 from lmcache.v1.mp_coordinator.api import (
     CACHE_EVENT_SCHEMA_VERSION,
@@ -55,9 +55,12 @@ def _parse(argv: list[str]) -> argparse.Namespace:
 
 def _events_file(path: str) -> str:
     key = ObjectKey(
-        chunk_hash=bytes.fromhex("aa"),
-        namespace=CacheNamespace(model_name="m", cache_salt="alice"),
-        kv_rank=0,
+        identity=ObjectKeyIdentity(
+            model_name="m",
+            cache_salt="alice",
+            chunk_hash=bytes.fromhex("aa"),
+            kv_rank=0,
+        )
     )
     batch = CacheEventBatch(
         instance_id="node-a",

@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import ObjectKey, Tier
 from lmcache.v1.mp_coordinator.api import (
     UNKNOWN_TOKEN_OFFSET,
@@ -26,9 +26,9 @@ from lmcache.v1.mp_coordinator.views.key_directory import KeyDirectory
 
 def _key(hash_byte: int) -> ObjectKey:
     return ObjectKey(
-        chunk_hash=bytes([hash_byte]) * 4,
-        namespace=CacheNamespace(model_name="m"),
-        kv_rank=0,
+        identity=ObjectKeyIdentity(
+            model_name="m", chunk_hash=bytes([hash_byte]) * 4, kv_rank=0
+        )
     )
 
 
@@ -291,9 +291,9 @@ def _chash(hash_byte: int) -> bytes:
 
 def _rank_key(hash_byte: int, kv_rank: int) -> ObjectKey:
     return ObjectKey(
-        chunk_hash=_chash(hash_byte),
-        namespace=CacheNamespace(model_name="m"),
-        kv_rank=kv_rank,
+        identity=ObjectKeyIdentity(
+            model_name="m", chunk_hash=_chash(hash_byte), kv_rank=kv_rank
+        )
     )
 
 
@@ -999,10 +999,12 @@ def test_same_backend_private_and_shared_are_distinct_placements():
 
 def _grouped_key(hash_byte: int, group: int, rank: int = 0) -> ObjectKey:
     return ObjectKey(
-        chunk_hash=bytes([hash_byte]) * 4,
-        namespace=CacheNamespace(model_name="m"),
-        kv_rank=rank,
-        object_group_id=group,
+        identity=ObjectKeyIdentity(
+            model_name="m",
+            chunk_hash=bytes([hash_byte]) * 4,
+            kv_rank=rank,
+            object_group_id=group,
+        )
     )
 
 

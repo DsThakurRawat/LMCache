@@ -22,7 +22,7 @@ import torch
 
 # First Party
 from lmcache import torch_dev, torch_device_type
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.config import L1ManagerConfig, L1MemoryManagerConfig
 from lmcache.v1.distributed.error import L1Error
@@ -62,9 +62,11 @@ if not torch_dev.is_available():
 def make_object_key(chunk_id: int) -> ObjectKey:
     """Create a test ObjectKey with the given chunk ID."""
     return ObjectKey(
-        chunk_hash=ObjectKey.IntHash2Bytes(chunk_id),
-        namespace=CacheNamespace(model_name="test_model"),
-        kv_rank=0,
+        identity=ObjectKeyIdentity(
+            model_name="test_model",
+            chunk_hash=ObjectKey.IntHash2Bytes(chunk_id),
+            kv_rank=0,
+        )
     )
 
 
@@ -826,18 +828,21 @@ def test_namespace_splits_store_batches(
     )
     base = replace(
         make_object_key(0),
-        namespace=CacheNamespace(model_name="model", tags={"dtype": "bf16"}),
+        identity=replace(make_object_key(0).identity, tags={"dtype": "bf16"}),
     )
     keys = [
         base,
         replace(
             base,
-            chunk_hash=ObjectKey.IntHash2Bytes(1),
-            namespace=CacheNamespace(model_name="model", tags={"dtype": "fp8"}),
+            identity=replace(
+                base.identity,
+                chunk_hash=ObjectKey.IntHash2Bytes(1),
+                tags={"dtype": "fp8"},
+            ),
         ),
         replace(
             base,
-            chunk_hash=ObjectKey.IntHash2Bytes(2),
+            identity=replace(base.identity, chunk_hash=ObjectKey.IntHash2Bytes(2)),
         ),
     ]
     try:
@@ -846,7 +851,10 @@ def test_namespace_splits_store_batches(
         ctrl.start()
         assert wait_for_condition(lambda: adapter.debug_get_stored_object_count() == 3)
         assert sorted(len(batch) for batch in batches) == [1, 2]
-        assert all(len({key.namespace for key in batch}) == 1 for batch in batches)
+        assert all(
+            len({tuple(key.identity.tags.items()) for key in batch}) == 1
+            for batch in batches
+        )
     finally:
         ctrl.stop()
         adapter.close()

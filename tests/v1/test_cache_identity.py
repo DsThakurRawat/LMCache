@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Cache namespace identity and transport contracts."""
+"""Cache identity identity and transport contracts."""
 
 # Standard
 from dataclasses import replace
@@ -9,7 +9,7 @@ import msgspec
 import pytest
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity, decode_tags
 from lmcache.v1.distributed.api import ObjectKey, ipc_key_to_object_keys
 from lmcache.v1.mp_coordinator.utils.encoding import decode_key, encode_key
 from lmcache.v1.multiprocess.custom_types import IPCCacheServerKey
@@ -24,131 +24,133 @@ from lmcache.v1.multiprocess.transport.grpc_impl.proto_codec import (
 )
 
 
-def test_namespace_identity_and_immutable_tags() -> None:
+def test_identity_and_immutable_tags() -> None:
     tags = {"tenant": "a", "version": "1"}
-    namespace = CacheNamespace(model_name="model", tags=tags)
-    key = ObjectKey(
-        chunk_hash=b"1234",
-        namespace=namespace,
-        kv_rank=1,
+    identity = ObjectKeyIdentity(
+        chunk_hash=b"1234", kv_rank=1, model_name="model", tags=tags
     )
-    same = replace(key, namespace=replace(namespace, tags=dict(reversed(tags.items()))))
+    key = ObjectKey(identity=identity)
+    same = replace(key, identity=replace(identity, tags=dict(reversed(tags.items()))))
     assert key == same and hash(key) == hash(same)
     assert key.to_storage_key() == same.to_storage_key()
     tags["tenant"] = "b"
-    assert namespace.tags["tenant"] == "a"
+    assert identity.tags["tenant"] == "a"
     with pytest.raises(TypeError, match="immutable"):
-        namespace.tags["tenant"] = "b"  # type: ignore[index]
-    assert key != replace(key, namespace=replace(namespace, tags=tags))
-    assert key != replace(key, namespace=replace(namespace, model_name="another"))
-    assert key != replace(key, namespace=replace(namespace, cache_salt="tenant-b"))
+        identity.tags["tenant"] = "b"  # type: ignore[index]
+    assert key != replace(key, identity=replace(identity, tags=tags))
+    assert key != replace(key, identity=replace(identity, model_name="another"))
+    assert key != replace(key, identity=replace(identity, cache_salt="tenant-b"))
+    assert key != ObjectKey(identity=replace(identity, chunk_hash=b"5678"))
+    assert key != ObjectKey(identity=replace(identity, kv_rank=2))
+    assert key != ObjectKey(identity=replace(identity, object_group_id=1))
+    assert decode_tags(identity.tags_token()) == identity.tags
     assert (
-        CacheNamespace.from_token(
-            namespace.to_token(),
-            model_name=namespace.model_name,
-            cache_salt=namespace.cache_salt,
-        )
-        == namespace
+        ObjectKeyIdentity(
+            chunk_hash=b"1234", kv_rank=1, model_name="model"
+        ).tags_token()
+        == ""
     )
-    assert CacheNamespace(model_name="model").to_token() == ""
 
 
 @pytest.mark.parametrize("token", ["x2-abc", "x1-!", "x1-e30"])
-def test_namespace_rejects_invalid_tokens(token: str) -> None:
+def test_identity_rejects_invalid_tokens(token: str) -> None:
     with pytest.raises(ValueError):
-        CacheNamespace.from_token(token, model_name="model")
+        decode_tags(token)
 
 
 @pytest.mark.parametrize("tags", [{"": "v"}, {"a": 1}])
 def test_invalid_tags(tags: dict[str, str]) -> None:
     with pytest.raises(ValueError):
-        CacheNamespace(model_name="model", tags=tags)
+        ObjectKeyIdentity(chunk_hash=b"1234", kv_rank=1, model_name="model", tags=tags)
 
 
-def test_namespace_transport_and_object_expansion() -> None:
+def test_identity_transport_and_object_expansion() -> None:
     ipc = IPCCacheServerKey.from_token_ids(
         "model",
         2,
         None,
         [1, 2],
         end=2,
-        namespace=CacheNamespace(
-            model_name="model",
-            tags={"tenant": "a", "app": "v1"},
-        ),
+        tags={"tenant": "a", "app": "v1"},
     )
     for codec in (msgspec.msgpack, msgspec.json):
         decoded = codec.decode(codec.encode(ipc), type=IPCCacheServerKey)
         assert decoded == ipc and hash(decoded) == hash(ipc)
-        assert list(decoded.namespace.tags) == ["app", "tenant"]
-        assert decoded.namespace.to_token() == ipc.namespace.to_token()
+        assert list(decoded.identity.tags) == ["app", "tenant"]
+        assert decoded.identity.tags_token() == ipc.identity.tags_token()
         groups = ipc_key_to_object_keys(decoded, [b"1234", b"5678"], [0, 1])
         assert len(groups) == 2 and all(len(group) == 4 for group in groups)
         for key in (key for group in groups for key in group):
-            assert key.namespace == ipc.namespace
+            assert key.identity.model_name == ipc.identity.model_name
+            assert key.identity.tags == ipc.identity.tags
             encoded = key.to_encoded_object_key()
             assert (
                 codec.decode(codec.encode(encoded), type=type(encoded)).to_object_key()
                 == key
             )
             assert decode_key(encode_key(key)) == key
-    assert replace(ipc, request_id="another", request_configs={"hint": 1}) == ipc
+    assert (
+        replace(
+            ipc, request_id="another", request_configs={"hint": 1}, num_kv_readers=3
+        )
+        == ipc
+    )
     legacy = msgspec.to_builtins(ipc)
-    del legacy["namespace"]
-    with pytest.raises(msgspec.ValidationError, match="namespace"):
+    del legacy["identity"]
+    with pytest.raises(msgspec.ValidationError, match="identity"):
         msgspec.convert(legacy, type=IPCCacheServerKey)
 
 
-def test_namespace_protobuf_roundtrip() -> None:
-    namespace = CacheNamespace(
+def test_identity_protobuf_roundtrip() -> None:
+    identity = ObjectKeyIdentity(
+        chunk_hash=b"1234",
+        kv_rank=0,
         model_name="model",
         tags={"tenant": "a", "app": "v1"},
     )
-    ipc = IPCCacheServerKey.from_token_ids("model", 1, 0, [1], namespace=namespace)
-    key = ObjectKey(
-        chunk_hash=b"1234",
-        namespace=namespace,
-        kv_rank=0,
-    )
+    ipc = IPCCacheServerKey.from_token_ids("model", 1, 0, [1], tags=identity.tags)
+    key = ObjectKey(identity=identity)
     for message_type, value in (
         (common_pb2.IpcCacheServerKey, ipc),
         (p2p_service_pb2.ObjectKey, key),
     ):
         encode, decode = compile_request_codec_for_types(message_type, (type(value),))
         message = encode((value,), {})
-        assert message.namespace.tags["tenant"] == "a"
-        assert message.namespace.model_name == "model"
+        assert message.identity.tags["tenant"] == "a"
+        assert message.identity.model_name == "model"
         (recovered,) = decode(message_type.FromString(message.SerializeToString()))
         assert recovered == value and hash(recovered) == hash(value)
-        assert list(recovered.namespace.tags) == ["app", "tenant"]
-        assert recovered.namespace.to_token() == namespace.to_token()
+        assert list(recovered.identity.tags) == ["app", "tenant"]
+        assert recovered.identity.tags_token() == identity.tags_token()
     _, decode = compile_request_codec_for_types(p2p_service_pb2.ObjectKey, (ObjectKey,))
     (legacy,) = decode(
         p2p_service_pb2.ObjectKey(
-            chunk_hash=b"1234", namespace=common_pb2.CacheNamespace(model_name="model")
+            identity=common_pb2.ObjectKeyIdentity(
+                model_name="model", chunk_hash=b"1234"
+            )
         )
     )
-    assert legacy.namespace == CacheNamespace(model_name="model")
+    assert legacy.identity == ObjectKeyIdentity(
+        chunk_hash=b"1234", kv_rank=0, model_name="model"
+    )
 
 
-def test_session_release_checks_namespace() -> None:
+def test_session_release_checks_identity() -> None:
     lookup = IPCCacheServerKey.from_token_ids(
         "model",
         1,
         None,
         [1],
         end=1,
-        namespace=CacheNamespace(model_name="model", tags={"dtype": "bf16"}),
+        tags={"dtype": "bf16"},
     )
     session = Session("r", TokenHasher(chunk_size=1))
     session.begin_lookup(lookup, (-1,))
     session.record_prefetch_result(1, (0,))
-    worker = replace(lookup, worker_id=0)
+    worker = replace(lookup, identity=replace(lookup.identity, worker_id=0))
     snapshot = session.prepare_failed_retrieve_release(worker)
     assert snapshot is not None
-    wrong = replace(
-        worker, namespace=CacheNamespace(model_name="model", tags={"dtype": "fp8"})
-    )
+    wrong = replace(worker, identity=replace(worker.identity, tags={"dtype": "fp8"}))
     assert session.prepare_failed_retrieve_release(wrong) is None
     assert not session.claim_failed_retrieve_release(1, wrong, snapshot[-1])
     assert session.claim_failed_retrieve_release(1, worker, snapshot[-1])

@@ -864,10 +864,10 @@ List cached keys and their placements, one page at a time.
       "keys": [
         {
           "key": {
-            "chunk_hash_hex": "aa12...",
-            "kv_rank": 0,
-            "object_group_id": 0,
-            "namespace": {
+            "identity": {
+              "chunk_hash_hex": "aa12...",
+              "kv_rank": 0,
+              "object_group_id": 0,
               "model_name": "meta-llama/Llama-3.1-8B-Instruct",
               "cache_salt": "",
               "tags": {}
@@ -949,10 +949,10 @@ forms -- supply exactly one:
     {
       "keys": [
         {
-          "chunk_hash_hex": "aa12...",
-          "kv_rank": 0,
-          "object_group_id": 0,
-          "namespace": {
+          "identity": {
+            "chunk_hash_hex": "aa12...",
+            "kv_rank": 0,
+            "object_group_id": 0,
             "model_name": "meta-llama/Llama-3.1-8B-Instruct",
             "cache_salt": "",
             "tags": {}
@@ -970,10 +970,10 @@ forms -- supply exactly one:
       "results": [
         {
           "key": {
-            "chunk_hash_hex": "aa12...",
-            "kv_rank": 0,
-            "object_group_id": 0,
-            "namespace": {
+            "identity": {
+              "chunk_hash_hex": "aa12...",
+              "kv_rank": 0,
+              "object_group_id": 0,
               "model_name": "...",
               "cache_salt": "",
               "tags": {}
@@ -1027,7 +1027,7 @@ of ``access`` events applied to the key, ``0`` for unknown keys.
     # Keys form -- keys taken from GET /directory/keys:
     curl -s -X POST http://localhost:9300/directory/lookup \
       -H 'Content-Type: application/json' \
-      -d '{"keys": [{"chunk_hash_hex": "aa12...", "kv_rank": 0, "namespace": {"model_name": "m", "cache_salt": "", "tags": {}}}]}'
+      -d '{"keys": [{"identity": {"chunk_hash_hex": "aa12...", "kv_rank": 0, "model_name": "m", "cache_salt": "", "tags": {}}}]}'
 
 Cache control
 -------------
@@ -1317,10 +1317,10 @@ List the keys currently pinned in the L2 eviction plan.
       "pins": [
         {
           "key": {
-            "chunk_hash_hex": "aa12...",
-            "kv_rank": 0,
-            "object_group_id": 0,
-            "namespace": {
+            "identity": {
+              "chunk_hash_hex": "aa12...",
+              "kv_rank": 0,
+              "object_group_id": 0,
               "model_name": "Qwen/Qwen3-8B",
               "cache_salt": "user-a",
               "tags": {}

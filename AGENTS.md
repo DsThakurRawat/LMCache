@@ -209,6 +209,10 @@ self-check with the `pre-pr-check` skill (both under `.claude/skills/`).
 
 ## CPU key-codec validation without a GPU build
 
+On macOS, verify `python3 --version` before using AST-based migration tools;
+the system interpreter may be Python 3.9 and cannot parse this repo's newer
+syntax. Use the prepared Python 3.12 environment for source audits and tests.
+
 A source-only checkout may import the lightweight key types but the root
 `tests/conftest.py` imports GPU connectors and requires `lmcache.device_ops`.
 For CPU key/transport tests, use `pytest --confcutdir=tests/v1 ...` to avoid that

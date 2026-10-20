@@ -19,13 +19,13 @@ def _client() -> TestClient:
 
 def _key(salt: str, h: str = "aa", model: str = "m", rank: int = 0) -> dict:
     return {
-        "chunk_hash_hex": h,
-        "kv_rank": rank,
-        "namespace": {
+        "identity": {
             "model_name": model,
             "cache_salt": salt,
             "tags": {},
-        },
+            "chunk_hash_hex": h,
+            "kv_rank": rank,
+        }
     }
 
 

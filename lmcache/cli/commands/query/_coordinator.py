@@ -208,16 +208,16 @@ def _render_keys(body: Any, metrics: Metrics) -> None:
     )
     for info in body.get("keys", []):
         key = info.get("key") or {}
-        namespace = key.get("namespace") or {}
+        identity = key.get("identity") or {}
         placements = ", ".join(
             f"{p.get('instance_id') or '(shared)'}:{p.get('tier')}/{p.get('backend')}"
             for p in info.get("placements", [])
         )
         table.add_row(
-            chunk=str(key.get("chunk_hash_hex", ""))[:12],
-            model=namespace.get("model_name") or "--",
-            kv_rank=key.get("kv_rank"),
-            cache_salt=namespace.get("cache_salt") or "(default)",
+            chunk=str(identity.get("chunk_hash_hex", ""))[:12],
+            model=identity.get("model_name") or "--",
+            kv_rank=identity.get("kv_rank"),
+            cache_salt=identity.get("cache_salt") or "(default)",
             placements=placements or "--",
         )
 

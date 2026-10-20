@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import IPCKeyIdentity
 from lmcache.v1.distributed.api import (
     ObjectKey,
     ipc_key_to_object_keys,
@@ -73,12 +73,14 @@ def _cache_key(
     end: int = 4,
 ) -> IPCCacheServerKey:
     return IPCCacheServerKey(
-        namespace=CacheNamespace(model_name="test-model"),
-        world_size=world_size,
-        worker_id=worker_id,
-        token_ids=(1, 2, 3, 4),
-        start=start,
-        end=end,
+        identity=IPCKeyIdentity(
+            model_name="test-model",
+            world_size=world_size,
+            worker_id=worker_id,
+            token_ids=(1, 2, 3, 4),
+            start=start,
+            end=end,
+        ),
         request_id=request_id,
     )
 

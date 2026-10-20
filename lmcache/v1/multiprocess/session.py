@@ -192,7 +192,9 @@ class Session:
             same_lookup = (
                 key.world_size == lookup_key.world_size
                 and key.token_ids == lookup_key.token_ids
-                and key.namespace == lookup_key.namespace
+                and key.model_name == lookup_key.model_name
+                and key.cache_salt == lookup_key.cache_salt
+                and key.identity.tags == lookup_key.identity.tags
                 and key.start >= lookup_key.start
                 and key.end <= lookup_key.end
             )
@@ -236,7 +238,9 @@ class Session:
             same_lookup = (
                 key.world_size == lookup_key.world_size
                 and key.token_ids == lookup_key.token_ids
-                and key.namespace == lookup_key.namespace
+                and key.model_name == lookup_key.model_name
+                and key.cache_salt == lookup_key.cache_salt
+                and key.identity.tags == lookup_key.identity.tags
                 and key.start >= lookup_key.start
                 and key.end <= lookup_key.end
             )

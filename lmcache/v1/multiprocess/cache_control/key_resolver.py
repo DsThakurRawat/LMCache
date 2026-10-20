@@ -18,7 +18,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import IPCKeyIdentity
 from lmcache.v1.distributed.api import (
     AttnWindowDesc,
     GroupedObjectKeys,
@@ -57,12 +57,15 @@ def _resolve_ipc_key_and_hashes(
             f"(limit={MAX_TOKEN_IDS}, got={len(token_ids)})"
         )
     ipc_key = IPCCacheServerKey(
-        namespace=CacheNamespace(model_name=model_name, cache_salt=cache_salt),
-        world_size=world_size,
-        worker_id=None,
-        token_ids=tuple(token_ids),
-        start=0,
-        end=len(token_ids),
+        identity=IPCKeyIdentity(
+            model_name=model_name,
+            cache_salt=cache_salt,
+            world_size=world_size,
+            worker_id=None,
+            token_ids=tuple(token_ids),
+            start=0,
+            end=len(token_ids),
+        ),
         request_id="",
     )
     chunk_hashes = token_hasher.compute_chunk_hashes(list(token_ids))

@@ -10,7 +10,7 @@ import time
 import pytest
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.l2_adapters import p2p_l2_adapter as p2p_mod
 from lmcache.v1.distributed.l2_adapters.p2p_l2_adapter import (
@@ -28,9 +28,9 @@ _LAYOUT = MemoryLayoutDesc(shapes=[], dtypes=[])
 
 def _key(i: int) -> ObjectKey:
     return ObjectKey(
-        chunk_hash=f"hash{i}".encode(),
-        namespace=CacheNamespace(model_name="m"),
-        kv_rank=1,
+        identity=ObjectKeyIdentity(
+            model_name="m", chunk_hash=f"hash{i}".encode(), kv_rank=1
+        )
     )
 
 

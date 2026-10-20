@@ -18,7 +18,11 @@ import torch
 
 # First Party
 from lmcache.logging import init_logger
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import (
+    EncodedObjectKeyIdentity,
+    ObjectKeyIdentity,
+    decode_tags,
+)
 
 if TYPE_CHECKING:
     # First Party
@@ -104,33 +108,35 @@ class ObjectKey:
     The unique identifier for an object in the distributed storage manager
     """
 
-    chunk_hash: bytes
-    """ Content hash of this particular chunk """
+    identity: ObjectKeyIdentity
 
-    namespace: CacheNamespace
-
-    kv_rank: int
-    """ The rank that uniquely identifies the slice of the KV cache """
-
-    object_group_id: int = 0
-    """ Index of the object group this chunk belongs to. """
-
-    def __post_init__(self) -> None:
-        if self.object_group_id < 0:
-            raise ValueError("object_group_id must be >= 0")
+    @property
+    def chunk_hash(self) -> bytes:
+        """Read chunk_hash from the identity."""
+        return self.identity.chunk_hash
 
     @property
     def model_name(self) -> str:
-        """Model identity, owned by the namespace."""
-        return self.namespace.model_name
+        """Read model_name from the identity."""
+        return self.identity.model_name
 
     @property
     def cache_salt(self) -> str:
-        """Isolation salt, owned by the namespace."""
-        return self.namespace.cache_salt
+        """Read cache_salt from the identity."""
+        return self.identity.cache_salt
+
+    @property
+    def kv_rank(self) -> int:
+        """Read kv_rank from the identity."""
+        return self.identity.kv_rank
+
+    @property
+    def object_group_id(self) -> int:
+        """Read object_group_id from the identity."""
+        return self.identity.object_group_id
 
     def to_storage_key(self) -> str:
-        """Return the canonical L2 wire key, including the complete namespace."""
+        """Return the canonical L2 wire key, including all identity fields."""
         return self.format_storage_key("{model}@{rank}@{group}@{hash}{suffix}")
 
     def format_storage_key(
@@ -145,10 +151,10 @@ class ObjectKey:
 
         Templates accept model, quoted_model, rank, group, hash, hash_prefix,
         salt and suffix.
-        A template without suffix receives the namespace token automatically.
+        A template without suffix receives the tags token automatically.
         Model escaping and rank formatting preserve existing backend names.
         """
-        token = self.namespace.to_token()
+        token = self.identity.tags_token()
         if not self.cache_salt and not token and template.endswith("@{salt}"):
             template = template[:-7]
         model = self.model_name.replace("/", model_separator)
@@ -174,18 +180,18 @@ class ObjectKey:
         return result
 
     def storage_shard(self) -> tuple[str, str]:
-        """Return two chunk-hash directory components, independent of namespace."""
+        """Return two directory components derived from the chunk hash."""
         chunk_hex = self.chunk_hash.hex()
         return chunk_hex[:2], chunk_hex[2:4]
 
     def to_filename(self) -> str:
-        """Return the native/Python FS filename; reject overlong namespace names."""
+        """Return the native/Python FS filename; reject overlong tagged names."""
         filename = self.format_storage_key(
             "{model}@{rank}@{group}@{hash}{suffix}.data",
             model_separator="-SEP-",
             rank_format="#010x",
         )
-        if self.namespace.to_token() and len(filename.encode("utf-8")) > 255:
+        if self.identity.tags_token() and len(filename.encode("utf-8")) > 255:
             raise ValueError("ObjectKey filename exceeds NAME_MAX (255 bytes)")
         return filename
 
@@ -193,7 +199,7 @@ class ObjectKey:
     def from_storage_key(
         cls, encoded: str, *, model_decoder: Callable[[str], str] = str
     ) -> "ObjectKey":
-        """Recover an L2 key; reject malformed fields and namespace encodings."""
+        """Recover an L2 key; reject malformed fields and tag encodings."""
         parts = encoded.split("@")
         token = parts.pop() if len(parts) == 6 else ""
         if len(parts) == 4:
@@ -202,12 +208,14 @@ class ObjectKey:
             raise ValueError("invalid ObjectKey encoding: expected 4, 5 or 6 fields")
         model, rank, group, chunk_hash, salt = parts
         return cls(
-            chunk_hash=bytes.fromhex(chunk_hash),
-            kv_rank=int(rank, 16),
-            object_group_id=int(group, 16),
-            namespace=CacheNamespace.from_token(
-                token, model_name=model_decoder(model), cache_salt=salt
-            ),
+            identity=ObjectKeyIdentity(
+                chunk_hash=bytes.fromhex(chunk_hash),
+                kv_rank=int(rank, 16),
+                object_group_id=int(group, 16),
+                model_name=model_decoder(model),
+                cache_salt=salt,
+                tags=decode_tags(token),
+            )
         )
 
     @classmethod
@@ -222,10 +230,14 @@ class ObjectKey:
     def to_encoded_object_key(self) -> "EncodedObjectKey":
         """Return the JSON-safe :class:`EncodedObjectKey` projection."""
         return EncodedObjectKey(
-            chunk_hash_hex=self.chunk_hash.hex(),
-            namespace=self.namespace,
-            kv_rank=self.kv_rank,
-            object_group_id=self.object_group_id,
+            identity=EncodedObjectKeyIdentity(
+                model_name=self.identity.model_name,
+                cache_salt=self.identity.cache_salt,
+                tags=self.identity.tags,
+                chunk_hash_hex=self.chunk_hash.hex(),
+                kv_rank=self.kv_rank,
+                object_group_id=self.object_group_id,
+            )
         )
 
     @staticmethod
@@ -309,25 +321,32 @@ class EncodedObjectKey:
     """JSON-safe wire form of :class:`ObjectKey` — ``chunk_hash`` is
     hex-encoded; other fields are preserved verbatim."""
 
-    chunk_hash_hex: str
-    """Hex-encoded ``ObjectKey.chunk_hash``."""
+    identity: EncodedObjectKeyIdentity
 
-    namespace: CacheNamespace
-    kv_rank: int
-
-    object_group_id: int = 0
-    """Defaults to ``0`` so pre-``object_group_id`` wire payloads still
-    deserialize."""
+    @property
+    def chunk_hash_hex(self) -> str:
+        """Read chunk_hash_hex from the identity."""
+        return self.identity.chunk_hash_hex
 
     @property
     def model_name(self) -> str:
-        """Model identity, owned by the namespace."""
-        return self.namespace.model_name
+        """Read model_name from the identity."""
+        return self.identity.model_name
 
     @property
     def cache_salt(self) -> str:
-        """Isolation salt, owned by the namespace."""
-        return self.namespace.cache_salt
+        """Read cache_salt from the identity."""
+        return self.identity.cache_salt
+
+    @property
+    def kv_rank(self) -> int:
+        """Read kv_rank from the identity."""
+        return self.identity.kv_rank
+
+    @property
+    def object_group_id(self) -> int:
+        """Read object_group_id from the identity."""
+        return self.identity.object_group_id
 
     def to_object_key(self) -> ObjectKey:
         """Recover the corresponding :class:`ObjectKey`.
@@ -337,10 +356,14 @@ class EncodedObjectKey:
                 :class:`ObjectKey`'s field invariants is violated.
         """
         return ObjectKey(
-            chunk_hash=bytes.fromhex(self.chunk_hash_hex),
-            namespace=self.namespace,
-            kv_rank=self.kv_rank,
-            object_group_id=self.object_group_id,
+            identity=ObjectKeyIdentity(
+                chunk_hash=bytes.fromhex(self.chunk_hash_hex),
+                kv_rank=self.kv_rank,
+                object_group_id=self.object_group_id,
+                model_name=self.model_name,
+                cache_salt=self.cache_salt,
+                tags=self.identity.tags,
+            )
         )
 
 
@@ -706,10 +729,14 @@ def ipc_key_to_object_keys(
     return [
         [
             ObjectKey(
-                chunk_hash=chunk_hash,
-                namespace=ipc_key.namespace,
-                kv_rank=kv_rank,
-                object_group_id=object_group_id,
+                identity=ObjectKeyIdentity(
+                    model_name=ipc_key.identity.model_name,
+                    cache_salt=ipc_key.identity.cache_salt,
+                    tags=ipc_key.identity.tags,
+                    chunk_hash=chunk_hash,
+                    kv_rank=kv_rank,
+                    object_group_id=object_group_id,
+                )
             )
             for chunk_hash in chunk_hashes
             for kv_rank in kv_ranks
@@ -774,10 +801,14 @@ def ipc_key_to_grouped_object_keys(
                 GroupedObjectKeys(
                     keys=[
                         ObjectKey(
-                            chunk_hash=chunk_hash,
-                            namespace=ipc_key.namespace,
-                            kv_rank=kv_rank,
-                            object_group_id=object_group_id,
+                            identity=ObjectKeyIdentity(
+                                model_name=ipc_key.identity.model_name,
+                                cache_salt=ipc_key.identity.cache_salt,
+                                tags=ipc_key.identity.tags,
+                                chunk_hash=chunk_hash,
+                                kv_rank=kv_rank,
+                                object_group_id=object_group_id,
+                            )
                         )
                         for chunk_hash in chunk_hashes
                     ],

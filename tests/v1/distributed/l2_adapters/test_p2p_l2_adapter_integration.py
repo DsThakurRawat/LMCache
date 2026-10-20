@@ -23,7 +23,7 @@ import torch
 
 # First Party
 from lmcache import torch_dev, torch_device_type
-from lmcache.v1.cache_namespace import CacheNamespace
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 
 if not torch_dev.is_available():
     pytest.skip(
@@ -158,9 +158,9 @@ class _PeerContext:
 
 def _key(i: int) -> ObjectKey:
     return ObjectKey(
-        chunk_hash=ObjectKey.IntHash2Bytes(i),
-        namespace=CacheNamespace(model_name="test_model"),
-        kv_rank=0,
+        identity=ObjectKeyIdentity(
+            model_name="test_model", chunk_hash=ObjectKey.IntHash2Bytes(i), kv_rank=0
+        )
     )
 
 
