@@ -65,12 +65,12 @@ def _make_key(n_chunks: int, start_chunks: int = 0) -> IPCCacheServerKey:
             model_name="m",
             world_size=1,
             worker_id=None,
-            token_ids=tuple(range(n_tokens)),
-            start=start_chunks * CHUNK_SIZE,
-            end=n_tokens,
         ),
         request_id="r",
         num_kv_readers=1,
+        token_ids=tuple(range(n_tokens)),
+        start=start_chunks * CHUNK_SIZE,
+        end=n_tokens,
     )
 
 

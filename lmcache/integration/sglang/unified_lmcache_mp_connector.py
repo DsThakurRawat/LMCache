@@ -616,13 +616,13 @@ class UnifiedLMCacheMPConnector:
                 cache_salt=operation.cache_salt,
                 world_size=self.kv_world_size,
                 worker_id=worker_id,
-                token_ids=tuple(operation.token_ids),
-                start=start,
-                end=end,
             ),
             request_id=operation.request_id,
             request_configs=request_configs,
             num_kv_readers=self.num_kv_readers,
+            token_ids=tuple(operation.token_ids),
+            start=start,
+            end=end,
         )
 
     def submit_lookup(

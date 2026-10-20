@@ -169,6 +169,9 @@ participating in `ObjectKey.__eq__` / `__hash__`.
 @dataclass(order=True, frozen=True)
 class IPCCacheServerKey:
     identity: IPCKeyIdentity
+    token_ids: tuple[int, ...]
+    start: int
+    end: int
     request_id: str = field(compare=False)
 ```
 
@@ -179,7 +182,7 @@ upgrade together. Existing untagged L2 names retain their original model/salt
 positions.
 
 `no_worker_id_version()` replaces only `identity.worker_id`, preserving the
-model, salt, tags and token range.
+model, salt and tags; the outer token inputs and range remain unchanged.
 
 ### 3. Dynamic Per-User Quotas via `QuotaManager`
 
@@ -354,8 +357,8 @@ Both adapters' `_create_key()` passes `cache_salt` through:
 def _create_key(self, token_ids, start, end, request_id, cache_salt=""):
     return IPCCacheServerKey(
         identity=IPCKeyIdentity(model_name=self.model_name, cache_salt=cache_salt,
-            world_size=self.world_size, worker_id=...,
-            token_ids=tuple(token_ids), start=start, end=end),
+            world_size=self.world_size, worker_id=...),
+        token_ids=tuple(token_ids), start=start, end=end,
         request_id=request_id,
     )
 ```

@@ -35,12 +35,18 @@ class IPCCacheServerKey:
     The server computes chunk hashes via TokenHasher and converts to
     ObjectKey for storage operations using ipc_key_to_object_keys().
 
+    token_ids and [start, end) are request inputs outside identity, but still
+    participate in equality/hash comparisons to distinguish request addresses.
+
     The request_id field is for session tracking and is NOT included
     in equality/hash comparisons (two keys with same content but different
     request_ids are considered equal for cache purposes).
     """
 
     identity: IPCKeyIdentity
+    token_ids: tuple[int, ...]
+    start: int
+    end: int
 
     # === Session tracking (not part of cache identity) ===
     request_id: str = field(compare=False)
@@ -74,21 +80,6 @@ class IPCCacheServerKey:
         """Read worker_id from the identity."""
         return self.identity.worker_id
 
-    @property
-    def token_ids(self) -> tuple[int, ...]:
-        """Read token_ids from the identity."""
-        return self.identity.token_ids
-
-    @property
-    def start(self) -> int:
-        """Read start from the identity."""
-        return self.identity.start
-
-    @property
-    def end(self) -> int:
-        """Read end from the identity."""
-        return self.identity.end
-
     # Helper function for unit tests only
     @classmethod
     def from_token_ids(
@@ -113,13 +104,13 @@ class IPCCacheServerKey:
             identity=IPCKeyIdentity(
                 world_size=world_size,
                 worker_id=worker_id,
-                token_ids=tuple(token_ids),
-                start=start,
-                end=end,
                 model_name=model_name,
                 cache_salt=cache_salt,
                 tags=tags if tags is not None else {},
             ),
+            token_ids=tuple(token_ids),
+            start=start,
+            end=end,
         )
 
     def require_num_kv_readers(self) -> int:

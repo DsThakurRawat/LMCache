@@ -77,11 +77,11 @@ def _cache_key(
             model_name="test-model",
             world_size=world_size,
             worker_id=worker_id,
-            token_ids=(1, 2, 3, 4),
-            start=start,
-            end=end,
         ),
         request_id=request_id,
+        token_ids=(1, 2, 3, 4),
+        start=start,
+        end=end,
     )
 
 

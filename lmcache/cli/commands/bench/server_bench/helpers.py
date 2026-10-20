@@ -170,12 +170,12 @@ def _make_key(
             model_name=_MODEL_NAME,
             world_size=world_size,
             worker_id=worker_id,
-            token_ids=token_ids,
-            start=start,
-            end=end if end > 0 else len(token_ids),
         ),
         request_id=request_id,
         num_kv_readers=num_kv_readers,
+        token_ids=token_ids,
+        start=start,
+        end=end if end > 0 else len(token_ids),
     )
 
 

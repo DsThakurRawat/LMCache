@@ -603,12 +603,12 @@ class KVClient:
                 cache_salt=cache_salt,
                 world_size=1,
                 worker_id=0,
-                token_ids=tuple(token_ids),
-                start=0,
-                end=chunks * CHUNK_SIZE,
             ),
             request_id=request_id,
             num_kv_readers=1,
+            token_ids=tuple(token_ids),
+            start=0,
+            end=chunks * CHUNK_SIZE,
         )
         event = self._transfer.create_recorded_event()
         stored = self._transfer.submit_store(

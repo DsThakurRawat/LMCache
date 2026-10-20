@@ -26,12 +26,12 @@ def _lookup_key(world_size: int) -> IPCCacheServerKey:
             model_name="m",
             world_size=world_size,
             worker_id=None,
-            token_ids=(0,),
-            start=0,
-            end=0,
         ),
         request_id="r",
         num_kv_readers=1,
+        token_ids=(0,),
+        start=0,
+        end=0,
     )
 
 
@@ -124,12 +124,12 @@ def test_lookup_hashing_stops_at_key_end() -> None:
             model_name="m",
             world_size=1,
             worker_id=None,
-            token_ids=tuple(range(32)),
-            start=0,
-            end=16,
         ),
         request_id="r",
         num_kv_readers=1,
+        token_ids=tuple(range(32)),
+        start=0,
+        end=16,
     )
 
     LookupModule(ctx).lookup(key, tp_size=1)

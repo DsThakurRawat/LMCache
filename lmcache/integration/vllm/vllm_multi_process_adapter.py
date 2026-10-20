@@ -1355,13 +1355,13 @@ class LMCacheMPSchedulerAdapter:
                 cache_salt=cache_salt,
                 world_size=self.world_size,
                 worker_id=None,
-                token_ids=tuple(token_ids),
-                start=start,
-                end=end,
             ),
             request_id=request_id,
             request_configs=request_configs,
             num_kv_readers=self.parallel_strategy.num_kv_readers,
+            token_ids=tuple(token_ids),
+            start=start,
+            end=end,
         )
 
     def update_pending_store_count(self, req_id: str, count: int) -> bool:
@@ -2773,11 +2773,11 @@ class LMCacheMPWorkerAdapter:
                 cache_salt=cache_salt,
                 world_size=self.world_size,
                 worker_id=self.worker_id,
-                token_ids=tuple(token_ids),
-                start=start,
-                end=end,
             ),
             request_id=request_id,
             request_configs=request_configs,
             num_kv_readers=self.parallel_strategy.num_kv_readers,
+            token_ids=tuple(token_ids),
+            start=start,
+            end=end,
         )

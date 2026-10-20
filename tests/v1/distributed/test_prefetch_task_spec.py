@@ -55,11 +55,11 @@ def _ipc_key(world_size: int, worker_id: int | None = None) -> IPCCacheServerKey
             cache_salt="salt",
             world_size=world_size,
             worker_id=worker_id,
-            token_ids=(0,),
-            start=0,
-            end=0,
         ),
         request_id="r",
+        token_ids=(0,),
+        start=0,
+        end=0,
     )
 
 

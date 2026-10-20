@@ -307,11 +307,11 @@ class TestIPCCacheServerKeyCacheSalt:
                 "model_name": "m",
                 "world_size": 1,
                 "worker_id": 0,
-                "token_ids": (1, 2),
-                "start": 0,
-                "end": 2,
             },
             "request_id": "r1",
+            "token_ids": (1, 2),
+            "start": 0,
+            "end": 2,
         }
         wire = msgspec.msgpack.encode(payload)
         decoded = msgspec.msgpack.decode(wire, type=IPCCacheServerKey)

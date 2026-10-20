@@ -9,9 +9,8 @@ package lmcache.mp;
 message IPCKeyIdentity {
   int64 world_size = 1;
   optional int64 worker_id = 2;
-  repeated int64 token_ids = 3;
-  int64 start = 4;
-  int64 end = 5;
+  reserved 3, 4, 5;
+  reserved "token_ids", "start", "end";
   string model_name = 6;
   string cache_salt = 7;
   map<string, string> tags = 8;
@@ -29,8 +28,11 @@ message ObjectKeyIdentity {
 // Cache key used by engine and CacheBlend RPCs.
 message IpcCacheServerKey {
   reserved 1, 2, 3, 4, 5, 6, 8, 11;
-  reserved "model_name", "world_size", "worker_id", "token_ids", "start", "end", "cache_salt", "namespace";
+  reserved "model_name", "world_size", "worker_id", "cache_salt", "namespace";
   IPCKeyIdentity identity = 12;
+  repeated int64 token_ids = 13;
+  int64 start = 14;
+  int64 end = 15;
   string request_id = 7;
   optional bytes encoded_request_configs = 9;
   int64 num_kv_readers = 10;

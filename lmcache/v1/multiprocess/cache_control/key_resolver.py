@@ -62,11 +62,11 @@ def _resolve_ipc_key_and_hashes(
             cache_salt=cache_salt,
             world_size=world_size,
             worker_id=None,
-            token_ids=tuple(token_ids),
-            start=0,
-            end=len(token_ids),
         ),
         request_id="",
+        token_ids=tuple(token_ids),
+        start=0,
+        end=len(token_ids),
     )
     chunk_hashes = token_hasher.compute_chunk_hashes(list(token_ids))
     return ipc_key, chunk_hashes

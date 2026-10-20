@@ -1,10 +1,10 @@
 Cache key identity
 ==================
 
-Each key stores a typed ``identity`` containing all fields used for matching.
-``ObjectKeyIdentity`` addresses stored chunks; ``IPCKeyIdentity`` addresses
-request token ranges and workers. Their fields differ, so they are separate
-classes rather than a shared namespace.
+Each key stores a typed ``identity`` for cache attributes interpreted by
+consumers. ``ObjectKeyIdentity`` identifies stored chunks; ``IPCKeyIdentity``
+contains the model, isolation and sharding attributes of a request. Their fields
+differ, so they are separate classes rather than a shared namespace.
 
 .. code-block:: python
 
@@ -22,9 +22,11 @@ classes rather than a shared namespace.
 
 ``ObjectKeyIdentity`` contains ``chunk_hash``, ``kv_rank``, ``model_name``,
 ``object_group_id``, ``cache_salt`` and ``tags``. ``IPCKeyIdentity`` contains
-``world_size``, ``worker_id``, ``token_ids``, ``start``, ``end``, ``model_name``,
-``cache_salt`` and ``tags``. IPC conversion constructs object identities
-explicitly, preserving model, salt and tags.
+``world_size``, ``worker_id``, ``model_name``, ``cache_salt`` and ``tags``.
+``token_ids``, ``start`` and ``end`` remain on ``IPCCacheServerKey`` as request
+inputs and operation range, and still participate in its equality/hashing.
+IPC conversion constructs object identities explicitly, preserving model,
+salt and tags.
 
 Tags accept a dictionary, copy and sort it, and expose an immutable mapping.
 Insertion order does not affect matching, hashing or storage names. Key

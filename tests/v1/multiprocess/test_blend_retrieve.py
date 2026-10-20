@@ -701,12 +701,12 @@ def _run_unretrieved_lookup(blend, request_id: str, num_kv_readers: int = 1):
             model_name="m",
             world_size=1,
             worker_id=None,
-            token_ids=tuple(query),
-            start=0,
-            end=len(query),
         ),
         request_id=request_id,
         num_kv_readers=num_kv_readers,
+        token_ids=tuple(query),
+        start=0,
+        end=len(query),
     )
     result = blend.cb_unified_lookup(key, tp_size=1)
     assert result is not None
@@ -870,12 +870,12 @@ def _classify_key(request_id: str = "req-classify", num_kv_readers: int = 1):
             model_name="m",
             world_size=1,
             worker_id=None,
-            token_ids=(1, 2, 3),
-            start=0,
-            end=3,
         ),
         request_id=request_id,
         num_kv_readers=num_kv_readers,
+        token_ids=(1, 2, 3),
+        start=0,
+        end=3,
     )
 
 

@@ -123,13 +123,13 @@ class LMCacheMPKvConnectorScheduler(KvCacheConnectorScheduler):
                 model_name=self._model_name,
                 world_size=self._world_size,
                 worker_id=None,
-                token_ids=tuple(token_ids),
-                start=start,
-                end=end,
             ),
             request_id=str(request_id),
             request_configs=request_configs,
             num_kv_readers=1,
+            token_ids=tuple(token_ids),
+            start=start,
+            end=end,
         )
 
     def get_num_new_matched_tokens(
@@ -316,12 +316,12 @@ class LMCacheMPKvConnectorWorker(KvCacheConnectorWorker):
                 model_name=self._model_name,
                 world_size=self._world_size,
                 worker_id=self._rank,
-                token_ids=tuple(token_ids),
-                start=0,
-                end=aligned_end,
             ),
             request_id=str(request_id),
             num_kv_readers=1,
+            token_ids=tuple(token_ids),
+            start=0,
+            end=aligned_end,
         )
 
     def register_kv_caches(self, kv_cache_tensor: torch.Tensor) -> None:

@@ -199,11 +199,11 @@ def test_submit_coordinator_match_sends_this_server_s_namespace():
             cache_salt="tenant-a",
             world_size=4,
             worker_id=None,
-            token_ids=tuple(range(8)),
-            start=0,
-            end=8,
         ),
         request_id="rid",
+        token_ids=tuple(range(8)),
+        start=0,
+        end=8,
     )
 
     assert eng._submit_coordinator_match(key) is True
@@ -226,11 +226,11 @@ def test_submit_coordinator_match_skips_a_query_shorter_than_a_chunk():
             model_name="llama",
             world_size=1,
             worker_id=None,
-            token_ids=(1, 2),
-            start=0,
-            end=2,
         ),
         request_id="rid",
+        token_ids=(1, 2),
+        start=0,
+        end=2,
     )
 
     assert eng._submit_coordinator_match(key) is False
@@ -631,12 +631,12 @@ def _store_hook_key(num_chunks: int, chunk_size: int = 4):
             model_name="m",
             world_size=1,
             worker_id=0,
-            token_ids=tuple(range(1000, 1000 + n)),
-            start=0,
-            end=n,
         ),
         request_id="req-store-mask",
         num_kv_readers=1,
+        token_ids=tuple(range(1000, 1000 + n)),
+        start=0,
+        end=n,
     )
 
 

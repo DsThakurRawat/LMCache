@@ -95,6 +95,14 @@ def test_identity_transport_and_object_expansion() -> None:
         )
         == ipc
     )
+    requests = [
+        ipc,
+        replace(ipc, token_ids=(3, 4)),
+        replace(ipc, start=1),
+        replace(ipc, end=1),
+    ]
+    assert all(request.identity == ipc.identity for request in requests)
+    assert len(set(requests)) == 4
     legacy = msgspec.to_builtins(ipc)
     del legacy["identity"]
     with pytest.raises(msgspec.ValidationError, match="identity"):

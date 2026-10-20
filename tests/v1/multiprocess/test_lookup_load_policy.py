@@ -76,13 +76,13 @@ def _key(request_configs: dict[str, Any] | None) -> IPCCacheServerKey:
             model_name="m",
             world_size=1,
             worker_id=None,
-            token_ids=tuple(range(len(CHUNK_HASHES) * CHUNK_SIZE)),
-            start=0,
-            end=len(CHUNK_HASHES) * CHUNK_SIZE,
         ),
         request_id="req-1",
         request_configs=request_configs,
         num_kv_readers=1,
+        token_ids=tuple(range(len(CHUNK_HASHES) * CHUNK_SIZE)),
+        start=0,
+        end=len(CHUNK_HASHES) * CHUNK_SIZE,
     )
 
 

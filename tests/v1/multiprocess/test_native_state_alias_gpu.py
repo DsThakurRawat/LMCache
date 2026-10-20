@@ -211,12 +211,12 @@ def test_native_alias_sparse_checkpoint_roundtrip(native_client: RequestClient) 
             model_name="native-alias-roundtrip",
             world_size=1,
             worker_id=0,
-            token_ids=tokens,
-            start=0,
-            end=4 * CHUNK,
         ),
         request_id="native-save",
         num_kv_readers=1,
+        token_ids=tokens,
+        start=0,
+        end=4 * CHUNK,
     )
     native_client.register_kv_cache(
         instance_id,
@@ -231,7 +231,7 @@ def test_native_alias_sparse_checkpoint_roundtrip(native_client: RequestClient) 
         assert _transfer(
             native_client,
             "store",
-            replace(key, identity=replace(key.identity, end=2 * CHUNK)),
+            replace(key, end=2 * CHUNK),
             instance_id,
             [list(range(8)), [-1, 0], [-1, 0]],
             device,
@@ -239,7 +239,7 @@ def test_native_alias_sparse_checkpoint_roundtrip(native_client: RequestClient) 
         assert _transfer(
             native_client,
             "store",
-            replace(key, identity=replace(key.identity, start=2 * CHUNK)),
+            replace(key, start=2 * CHUNK),
             instance_id,
             [list(range(8, 16)), [-1, 1], [-1, 1]],
             device,
@@ -256,17 +256,19 @@ def test_native_alias_sparse_checkpoint_roundtrip(native_client: RequestClient) 
                 identity=replace(
                     key.identity,
                     worker_id=None,
-                    token_ids=tokens[: limit_chunks * CHUNK],
-                    end=limit_chunks * CHUNK,
                 ),
                 request_id=f"native-load-{limit_chunks}",
+                token_ids=tokens[: limit_chunks * CHUNK],
+                end=limit_chunks * CHUNK,
             )
             lookup_key = _lookup_when_visible(native_client, lookup_key, expected_hit)
             retrieve_key = replace(
                 lookup_key,
                 identity=replace(
-                    lookup_key.identity, worker_id=0, end=expected_hit * CHUNK
+                    lookup_key.identity,
+                    worker_id=0,
                 ),
+                end=expected_hit * CHUNK,
             )
             target_pages = list(range(16, 16 + expected_hit * 4))
             target_state = [-1] * (expected_hit - 1) + [destination_unit]
@@ -326,12 +328,12 @@ def test_state_ordinals_alias_the_page_allocation(native_client: RequestClient) 
             model_name="native-shared-page-pool",
             world_size=1,
             worker_id=0,
-            token_ids=tuple(range(2 * CHUNK)),
-            start=0,
-            end=2 * CHUNK,
         ),
         request_id="same-pool-save",
         num_kv_readers=1,
+        token_ids=tuple(range(2 * CHUNK)),
+        start=0,
+        end=2 * CHUNK,
     )
     native_client.register_kv_cache(
         instance_id,

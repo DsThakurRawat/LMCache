@@ -135,12 +135,12 @@ def _reader_key(readers: int) -> IPCCacheServerKey:
             model_name="m",
             world_size=8,
             worker_id=0,
-            token_ids=(1, 2, 3),
-            start=0,
-            end=3,
         ),
         request_id="req",
         num_kv_readers=readers,
+        token_ids=(1, 2, 3),
+        start=0,
+        end=3,
     )
 
 

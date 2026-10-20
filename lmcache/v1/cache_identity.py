@@ -106,13 +106,10 @@ class ObjectKeyIdentity:
 
 @dataclass(frozen=True, order=False)
 class IPCKeyIdentity:
-    """Complete matching identity of a token-based IPC request."""
+    """Model, isolation and sharding attributes of an IPC request."""
 
     world_size: int
     worker_id: int | None
-    token_ids: tuple[int, ...]
-    start: int
-    end: int
     model_name: str
     cache_salt: str = ""
     tags: Mapping[str, str] = field(default_factory=dict)
@@ -129,9 +126,6 @@ class IPCKeyIdentity:
             (
                 self.world_size,
                 self.worker_id,
-                self.token_ids,
-                self.start,
-                self.end,
                 self.model_name,
                 self.cache_salt,
                 tuple(self.tags.items()),
@@ -142,18 +136,12 @@ class IPCKeyIdentity:
         return (
             self.world_size,
             self.worker_id,
-            self.token_ids,
-            self.start,
-            self.end,
             self.model_name,
             self.cache_salt,
             tuple(self.tags.items()),
         ) < (
             other.world_size,
             other.worker_id,
-            other.token_ids,
-            other.start,
-            other.end,
             other.model_name,
             other.cache_salt,
             tuple(other.tags.items()),

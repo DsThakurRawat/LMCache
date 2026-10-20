@@ -165,12 +165,12 @@ def _key(world_size: int = 1, tokens: tuple[int, ...] = TOKENS) -> IPCCacheServe
             model_name="native-state",
             world_size=world_size,
             worker_id=None,
-            token_ids=tokens,
-            start=0,
-            end=len(tokens),
         ),
         request_id="native-request",
         num_kv_readers=1,
+        token_ids=tokens,
+        start=0,
+        end=len(tokens),
     )
 
 
@@ -187,7 +187,7 @@ def _lookup(
     world_size = len(checkpoint_ends)
     key = _key(world_size, query_tokens)
     if query_end is not None:
-        key = replace(key, identity=replace(key.identity, end=query_end))
+        key = replace(key, end=query_end)
     present: set[ObjectKey] = set()
     for rank, endpoints in enumerate(checkpoint_ends):
         worker_key = replace(key, identity=replace(key.identity, worker_id=rank))

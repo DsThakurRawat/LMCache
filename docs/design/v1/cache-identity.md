@@ -2,20 +2,23 @@
 
 ## Identity and metadata
 
-Each key owns a complete, typed `identity`. A field belongs there when it
-participates in matching; interpreted attributes use explicit fields, while
-opaque matching dimensions use `tags`.
+Each key owns a typed `identity` for cache attributes interpreted by consumers.
+Opaque matching dimensions use `tags`. IPC request inputs and operation ranges
+remain separate from these attributes.
 
 - `ObjectKeyIdentity`: `chunk_hash`, `kv_rank`, `model_name`, `object_group_id`,
   `cache_salt`, `tags`.
-- `IPCKeyIdentity`: `world_size`, `worker_id`, `token_ids`, `start`, `end`,
-  `model_name`, `cache_salt`, `tags`.
+- `IPCKeyIdentity`: `world_size`, `worker_id`, `model_name`, `cache_salt`, `tags`.
 
 These are separate types because requests address token ranges and workers,
 whereas stored objects address chunk hashes, KV ranks and object groups. They
 share tag normalization, not a common identity container or base class.
-`ObjectKey` stores only its identity. `IPCCacheServerKey` additionally carries
-`request_id`, `request_configs` and `num_kv_readers`, excluded from matching.
+`ObjectKey` stores only its identity. `IPCCacheServerKey` carries `token_ids`,
+`start` and `end` outside identity: these are inputs to chunk hashing and the
+range of this operation, rather than the identity of any one stored object.
+They still participate in IPC key equality/hashing, so different content or
+ranges remain distinct. `request_id`, `request_configs` and `num_kv_readers`
+also stay outside identity and are excluded from equality/hashing.
 Read-only properties on the keys forward existing field reads to the identity;
 they do not duplicate state.
 
