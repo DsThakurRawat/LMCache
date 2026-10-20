@@ -44,7 +44,7 @@ from lmcache.v1.distributed.storage_controllers.store_policy import (
     StorePolicy,
 )
 from lmcache.v1.distributed.storage_controllers.utils import L2AdapterDescriptor
-from lmcache.v1.key_extensions import KeyExtensions
+from lmcache.v1.key_attributes import KeyAttribute
 from lmcache.v1.memory_management import MemoryObj
 from tests.v1.distributed.utils import should_use_lazy_alloc
 
@@ -824,12 +824,22 @@ def test_matching_extensions_split_store_batches(
         adapter_descriptors=[make_descriptor(0)],
         policy=DefaultStorePolicy(),
     )
-    ext = KeyExtensions(identity=("bf16",), metadata=(("trace", "a"),))
+    base = replace(
+        make_object_key(0),
+        identity=(KeyAttribute("dtype", "bf16"),),
+        metadata=(KeyAttribute("trace", "a"),),
+    )
     keys = [
-        replace(make_object_key(0), extensions=ext),
-        replace(make_object_key(1), extensions=replace(ext, identity=("fp8",))),
+        base,
         replace(
-            make_object_key(2), extensions=replace(ext, metadata=(("trace", "b"),))
+            base,
+            chunk_hash=ObjectKey.IntHash2Bytes(1),
+            identity=(KeyAttribute("dtype", "fp8"),),
+        ),
+        replace(
+            base,
+            chunk_hash=ObjectKey.IntHash2Bytes(2),
+            metadata=(KeyAttribute("trace", "b"),),
         ),
     ]
     try:
@@ -838,7 +848,10 @@ def test_matching_extensions_split_store_batches(
         ctrl.start()
         assert wait_for_condition(lambda: adapter.debug_get_stored_object_count() == 3)
         assert sorted(len(batch) for batch in batches) == [1, 2]
-        assert all(len({key.extensions for key in batch}) == 1 for batch in batches)
+        assert all(
+            len({(key.identity, key.named_identity) for key in batch}) == 1
+            for batch in batches
+        )
     finally:
         ctrl.stop()
         adapter.close()

@@ -27,7 +27,7 @@ from lmcache.v1.distributed.l2_adapters.s3_l2_adapter import (
     _string_to_object_key,
 )
 from lmcache.v1.distributed.serde.utils import make_temp_key
-from lmcache.v1.key_extensions import KeyExtensions
+from lmcache.v1.key_attributes import KeyAttribute, encode_key_attributes
 from lmcache.v1.mp_observability.trace.codecs import decode_value, encode_value
 
 
@@ -38,14 +38,12 @@ def test_backend_names_recovery_and_trace(salt: str) -> None:
         "org/model",
         1,
         cache_salt=salt,
-        extensions=KeyExtensions(
-            identity=("bf16",),
-            metadata=(("trace", "a"),),
-            named_identity=(("codec", "raw-v1"),),
-        ),
+        identity=(KeyAttribute("dtype", "bf16"),),
+        metadata=(KeyAttribute("trace", "a"),),
+        named_identity=(KeyAttribute("codec", "raw-v1"),),
     )
-    hint = replace(key, extensions=replace(key.extensions, metadata=(("trace", "b"),)))
-    other = replace(key, extensions=replace(key.extensions, identity=("fp8",)))
+    hint = replace(key, metadata=(KeyAttribute("trace", "b"),))
+    other = replace(key, identity=(KeyAttribute("dtype", "fp8"),))
     for encode in (
         _object_key_to_filename,
         _object_key_to_string,
@@ -60,21 +58,19 @@ def test_backend_names_recovery_and_trace(salt: str) -> None:
         _string_to_object_key(s3_name(key)),
     ):
         assert recovered == key
-        assert recovered.extensions.metadata == ()
-        assert recovered.extensions.named_identity == key.extensions.named_identity
+        assert recovered.metadata == ()
+        assert recovered.named_identity == key.named_identity
     temp = make_temp_key(key)
-    assert temp.extensions.metadata == key.extensions.metadata
-    assert temp.extensions.named_identity == key.extensions.named_identity
+    assert temp.metadata == key.metadata
+    assert temp.named_identity == key.named_identity
     assert temp.chunk_hash != key.chunk_hash
     traced = decode_value(encode_value(key))
     assert traced == key
-    assert traced.extensions.metadata == key.extensions.metadata
+    assert traced.metadata == key.metadata
 
 
 def test_fs_rejects_invalid_or_overlong_extension() -> None:
-    key = ObjectKey(
-        b"1234", "model", 1, extensions=KeyExtensions(identity=("a" * 200,))
-    )
+    key = ObjectKey(b"1234", "model", 1, identity=(KeyAttribute("large", "a" * 200),))
     with pytest.raises(ValueError, match="NAME_MAX"):
         _object_key_to_filename(key)
     assert _filename_to_object_key("model@0x00000001@0@31323334@@x2-abc.data") is None
@@ -105,13 +101,8 @@ int main(int argc, char** argv) {
         capture_output=True,
     )
     for salt in ("", "tenant"):
-        for extensions in (
-            KeyExtensions(),
-            KeyExtensions(identity=("bf16",), named_identity=(("codec", "raw-v1"),)),
-        ):
-            key = ObjectKey(
-                b"1234", "org/model", 1, cache_salt=salt, extensions=extensions
-            )
+        for identity in ((), (KeyAttribute("dtype", "bf16"),)):
+            key = ObjectKey(b"1234", "org/model", 1, cache_salt=salt, identity=identity)
             wire = _object_key_to_string(key)
             result = subprocess.check_output(
                 [str(executable), wire], text=True
@@ -120,10 +111,9 @@ int main(int argc, char** argv) {
 
 
 def test_bigtable_extended_unsalted_cannot_alias_legacy_salt() -> None:
-    ext = KeyExtensions(identity=("bf16",))
-    extended = ObjectKey(b"1234", "model", 1, extensions=ext)
+    extended = ObjectKey(b"1234", "model", 1, identity=(KeyAttribute("dtype", "bf16"),))
     legacy = replace(
-        extended, extensions=KeyExtensions(), cache_salt=ext.to_storage_token()
+        extended, identity=(), cache_salt=encode_key_attributes(extended.identity, ())
     )
     encoder = BigtableL2KeyEncoder()
     assert encoder.encode_row_key(extended) != encoder.encode_row_key(legacy)

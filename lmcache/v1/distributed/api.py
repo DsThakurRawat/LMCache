@@ -16,7 +16,7 @@ import torch
 
 # First Party
 from lmcache.logging import init_logger
-from lmcache.v1.key_extensions import KeyExtensions
+from lmcache.v1.key_attributes import KeyAttribute, canonicalize_key_attributes
 
 if TYPE_CHECKING:
     # First Party
@@ -137,13 +137,24 @@ class ObjectKey:
     hash, and extension are added.
     """
 
-    extensions: KeyExtensions = field(default_factory=KeyExtensions)
-    """Opaque identity, named metadata, and named identity attributes."""
+    identity: tuple[KeyAttribute, ...] = ()
+    """Named attributes used for matching only."""
+
+    metadata: tuple[KeyAttribute, ...] = field(default=(), compare=False)
+    """Operation metadata excluded from equality, hashing and ordering."""
+
+    named_identity: tuple[KeyAttribute, ...] = ()
+    """Matching attributes also interpreted by other modules."""
 
     _SALT_FORBIDDEN_CHARS = frozenset("@/\\\x00")
     _SALT_MAX_LEN = 128
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "identity", canonicalize_key_attributes(self.identity))
+        object.__setattr__(self, "metadata", canonicalize_key_attributes(self.metadata))
+        object.__setattr__(
+            self, "named_identity", canonicalize_key_attributes(self.named_identity)
+        )
         if "@" in self.model_name:
             raise ValueError(
                 f"model_name must not contain '@' (got {self.model_name!r})"
@@ -171,7 +182,9 @@ class ObjectKey:
             kv_rank=self.kv_rank,
             object_group_id=self.object_group_id,
             cache_salt=self.cache_salt,
-            extensions=self.extensions,
+            identity=self.identity,
+            metadata=self.metadata,
+            named_identity=self.named_identity,
         )
 
     @staticmethod
@@ -267,7 +280,21 @@ class EncodedObjectKey:
 
     cache_salt: str = ""
 
-    extensions: KeyExtensions = field(default_factory=KeyExtensions)
+    identity: tuple[KeyAttribute, ...] = ()
+    """Named attributes used for matching only."""
+
+    metadata: tuple[KeyAttribute, ...] = field(default=(), compare=False)
+    """Operation metadata excluded from equality, hashing and ordering."""
+
+    named_identity: tuple[KeyAttribute, ...] = ()
+    """Matching attributes also interpreted by other modules."""
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "identity", canonicalize_key_attributes(self.identity))
+        object.__setattr__(self, "metadata", canonicalize_key_attributes(self.metadata))
+        object.__setattr__(
+            self, "named_identity", canonicalize_key_attributes(self.named_identity)
+        )
 
     def to_object_key(self) -> ObjectKey:
         """Recover the corresponding :class:`ObjectKey`.
@@ -282,7 +309,9 @@ class EncodedObjectKey:
             kv_rank=self.kv_rank,
             object_group_id=self.object_group_id,
             cache_salt=self.cache_salt,
-            extensions=self.extensions,
+            identity=self.identity,
+            metadata=self.metadata,
+            named_identity=self.named_identity,
         )
 
 
@@ -655,7 +684,9 @@ def ipc_key_to_object_keys(
                 kv_rank=kv_rank,
                 object_group_id=object_group_id,
                 cache_salt=cache_salt,
-                extensions=ipc_key.extensions,
+                identity=ipc_key.identity,
+                metadata=ipc_key.metadata,
+                named_identity=ipc_key.named_identity,
             )
             for chunk_hash in chunk_hashes
             for kv_rank in kv_ranks
@@ -725,7 +756,9 @@ def ipc_key_to_grouped_object_keys(
                             kv_rank=kv_rank,
                             object_group_id=object_group_id,
                             cache_salt=ipc_key.cache_salt,
-                            extensions=ipc_key.extensions,
+                            identity=ipc_key.identity,
+                            metadata=ipc_key.metadata,
+                            named_identity=ipc_key.named_identity,
                         )
                         for chunk_hash in chunk_hashes
                     ],

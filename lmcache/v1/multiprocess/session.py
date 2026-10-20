@@ -194,7 +194,8 @@ class Session:
                 and key.world_size == lookup_key.world_size
                 and key.token_ids == lookup_key.token_ids
                 and key.cache_salt == lookup_key.cache_salt
-                and key.extensions == lookup_key.extensions
+                and key.identity == lookup_key.identity
+                and key.named_identity == lookup_key.named_identity
                 and key.start >= lookup_key.start
                 and key.end <= lookup_key.end
             )
@@ -240,7 +241,8 @@ class Session:
                 and key.world_size == lookup_key.world_size
                 and key.token_ids == lookup_key.token_ids
                 and key.cache_salt == lookup_key.cache_salt
-                and key.extensions == lookup_key.extensions
+                and key.identity == lookup_key.identity
+                and key.named_identity == lookup_key.named_identity
                 and key.start >= lookup_key.start
                 and key.end <= lookup_key.end
             )

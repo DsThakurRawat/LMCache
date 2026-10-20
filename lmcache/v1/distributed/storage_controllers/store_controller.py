@@ -33,7 +33,7 @@ from lmcache.v1.distributed.storage_controllers.store_policy import (
     StorePolicy,
 )
 from lmcache.v1.distributed.storage_controllers.utils import L2AdapterDescriptor
-from lmcache.v1.key_extensions import KeyExtensions
+from lmcache.v1.key_attributes import KeyAttribute
 from lmcache.v1.mp_observability.event import Event, EventType
 from lmcache.v1.mp_observability.event_bus import get_event_bus
 from lmcache.v1.mp_observability.otel_init import register_gauge
@@ -50,19 +50,26 @@ STORE_LOOP_POLL_TIMEOUT_MS = 500
 
 def _group_keys_by_shape(
     keys: list[ObjectKey],
-) -> dict[tuple[str, int, KeyExtensions], list[ObjectKey]]:
+) -> dict[
+    tuple[str, int, tuple[KeyAttribute, ...], tuple[KeyAttribute, ...]], list[ObjectKey]
+]:
     """Group ``keys`` by the fields that determine their KV cache shape.
 
     Each bucket shares a single ``(shape, dtype)``, so each bucket can be
     submitted as one ``submit_store_task`` call. Today the shape is pinned
-    by ``(model_name, kv_rank, extensions)`` — ``kv_rank`` packs ``world_size`` and
-    parallelism config, so different TP/PP setups land in different
-    buckets. Matching extensions may describe precision or layout and must
-    also agree; metadata-only differences do not split store batches.
+    by model/rank and both matching attribute collections. ``kv_rank`` packs
+    world size and parallelism config, so different TP/PP setups land in
+    different buckets. Matching attributes may describe precision or layout
+    and must also agree; metadata-only differences do not split store batches.
     """
-    groups: dict[tuple[str, int, KeyExtensions], list[ObjectKey]] = defaultdict(list)
+    groups: dict[
+        tuple[str, int, tuple[KeyAttribute, ...], tuple[KeyAttribute, ...]],
+        list[ObjectKey],
+    ] = defaultdict(list)
     for key in keys:
-        groups[(key.model_name, key.kv_rank, key.extensions)].append(key)
+        groups[(key.model_name, key.kv_rank, key.identity, key.named_identity)].append(
+            key
+        )
     return groups
 
 

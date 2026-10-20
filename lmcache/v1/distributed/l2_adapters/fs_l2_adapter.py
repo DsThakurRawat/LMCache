@@ -44,7 +44,11 @@ from lmcache.v1.distributed.l2_adapters.config import (
 from lmcache.v1.distributed.l2_adapters.factory import (
     register_l2_adapter_factory,
 )
-from lmcache.v1.key_extensions import KeyExtensions
+from lmcache.v1.key_attributes import (
+    decode_key_attributes,
+    encode_key_attributes,
+    key_attribute_suffix,
+)
 from lmcache.v1.platform import create_event_notifier
 
 logger = init_logger(__name__)
@@ -120,8 +124,15 @@ def _object_key_to_filename(key: ObjectKey) -> str:
         f"{safe_model}{_KEY_SEP}{key.kv_rank:#010x}"
         f"{_KEY_SEP}{key.object_group_id:x}{_KEY_SEP}{key.chunk_hash.hex()}"
     )
-    filename = base + key.extensions.storage_suffix(key.cache_salt) + _FILE_EXT
-    if key.extensions.to_storage_token() and len(filename.encode("utf-8")) > 255:
+    filename = (
+        base
+        + key_attribute_suffix(key.cache_salt, key.identity, key.named_identity)
+        + _FILE_EXT
+    )
+    if (
+        encode_key_attributes(key.identity, key.named_identity)
+        and len(filename.encode("utf-8")) > 255
+    ):
         raise ValueError("extended ObjectKey filename exceeds NAME_MAX (255 bytes)")
     return filename
 
@@ -153,6 +164,7 @@ def _filename_to_object_key(
 
     model_name = safe_model.replace(_PATH_SLASH_REPLACEMENT, "/")
     try:
+        identity, named_identity = decode_key_attributes(extension_token)
         chunk_hash = bytes.fromhex(chunk_hash_hex)
         kv_rank = int(kv_rank_str, 16)
         object_group_id = int(object_group_str, 16)
@@ -167,7 +179,8 @@ def _filename_to_object_key(
             kv_rank=kv_rank,
             object_group_id=object_group_id,
             cache_salt=cache_salt,
-            extensions=KeyExtensions.from_storage_token(extension_token),
+            identity=identity,
+            named_identity=named_identity,
         )
     except ValueError:
         return None

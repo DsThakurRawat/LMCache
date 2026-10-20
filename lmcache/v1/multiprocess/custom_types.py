@@ -8,7 +8,7 @@ import msgspec
 import torch
 
 # First Party
-from lmcache.v1.key_extensions import KeyExtensions
+from lmcache.v1.key_attributes import KeyAttribute, canonicalize_key_attributes
 from lmcache.v1.platform.base.ipc_wrapper import (  # noqa: E402,F401
     DeviceIPCWrapper,
 )
@@ -70,8 +70,14 @@ class IPCCacheServerKey:
     # lookups reject it.
     num_kv_readers: int = field(default=0, compare=False)
 
-    extensions: KeyExtensions = field(default_factory=KeyExtensions)
-    """Extension attributes forwarded to every derived ObjectKey."""
+    identity: tuple[KeyAttribute, ...] = ()
+    """Named attributes used for matching only."""
+
+    metadata: tuple[KeyAttribute, ...] = field(default=(), compare=False)
+    """Operation metadata excluded from equality, hashing and ordering."""
+
+    named_identity: tuple[KeyAttribute, ...] = ()
+    """Matching attributes also interpreted by other modules."""
 
     # Duplicated from ObjectKey — cannot import ObjectKey here due to
     # circular dependency (api.py imports IPCCacheServerKey).
@@ -79,6 +85,11 @@ class IPCCacheServerKey:
     _SALT_MAX_LEN = 128
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "identity", canonicalize_key_attributes(self.identity))
+        object.__setattr__(self, "metadata", canonicalize_key_attributes(self.metadata))
+        object.__setattr__(
+            self, "named_identity", canonicalize_key_attributes(self.named_identity)
+        )
         bad = self._SALT_FORBIDDEN_CHARS & set(self.cache_salt)
         if bad:
             raise ValueError(
@@ -104,7 +115,9 @@ class IPCCacheServerKey:
         cache_salt: str = "",
         num_kv_readers: int = 1,
         request_configs: dict[str, Any] | None = None,
-        extensions: KeyExtensions | None = None,
+        identity: tuple[KeyAttribute, ...] = (),
+        metadata: tuple[KeyAttribute, ...] = (),
+        named_identity: tuple[KeyAttribute, ...] = (),
     ) -> "IPCCacheServerKey":
         """Create a key from token ids. Only used by the tests."""
         return cls(
@@ -118,7 +131,9 @@ class IPCCacheServerKey:
             request_id=request_id,
             cache_salt=cache_salt,
             request_configs=request_configs,
-            extensions=extensions if extensions is not None else KeyExtensions(),
+            identity=identity,
+            metadata=metadata,
+            named_identity=named_identity,
         )
 
     def require_num_kv_readers(self) -> int:
@@ -151,7 +166,9 @@ class IPCCacheServerKey:
             request_id=self.request_id,
             cache_salt=self.cache_salt,
             request_configs=self.request_configs,
-            extensions=self.extensions,
+            identity=self.identity,
+            metadata=self.metadata,
+            named_identity=self.named_identity,
         )
 
 

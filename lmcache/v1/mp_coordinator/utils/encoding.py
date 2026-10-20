@@ -11,7 +11,7 @@ from typing import cast
 
 # First Party
 from lmcache.v1.distributed.api import ObjectKey
-from lmcache.v1.key_extensions import KeyExtensions
+from lmcache.v1.key_attributes import decode_key_attributes, encode_key_attributes
 
 EncodedKey = tuple[bytes, str, int, int, str] | tuple[bytes, str, int, int, str, str]
 """An :class:`ObjectKey` as ``(chunk_hash, model_name, kv_rank,
@@ -28,7 +28,7 @@ def encode_key(key: ObjectKey) -> EncodedKey:
         key.object_group_id,
         key.cache_salt,
     )
-    token = key.extensions.to_storage_token()
+    token = encode_key_attributes(key.identity, key.named_identity)
     return (*fields, token) if token else fields
 
 
@@ -50,10 +50,8 @@ def decode_key(encoded: object) -> ObjectKey:
     if len(values) not in (5, 6):
         raise ValueError("invalid coordinator key encoding: expected 5 or 6 fields")
     chunk_hash, model_name, kv_rank, object_group_id, cache_salt = values[:5]
-    extensions = (
-        KeyExtensions.from_storage_token(values[5])
-        if len(values) == 6
-        else KeyExtensions()
+    identity, named_identity = decode_key_attributes(
+        values[5] if len(values) == 6 else ""
     )
     return ObjectKey(
         chunk_hash=chunk_hash,
@@ -61,5 +59,6 @@ def decode_key(encoded: object) -> ObjectKey:
         kv_rank=kv_rank,
         object_group_id=object_group_id,
         cache_salt=cache_salt,
-        extensions=extensions,
+        identity=identity,
+        named_identity=named_identity,
     )

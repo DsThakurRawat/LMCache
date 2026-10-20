@@ -37,7 +37,7 @@ from lmcache.v1.distributed.api import (
     PrefetchLockMode,
     PrefetchTaskSpec,
 )
-from lmcache.v1.key_extensions import KeyExtensions
+from lmcache.v1.key_attributes import KeyAttribute
 
 
 @dataclass(frozen=True)
@@ -159,7 +159,9 @@ def _enc_object_key(k: ObjectKey) -> dict[str, Any]:
         "kv_rank": k.kv_rank,
         "object_group_id": k.object_group_id,
         "cache_salt": k.cache_salt,
-        "extensions": msgspec.to_builtins(k.extensions),
+        "identity": msgspec.to_builtins(k.identity),
+        "metadata": msgspec.to_builtins(k.metadata),
+        "named_identity": msgspec.to_builtins(k.named_identity),
     }
 
 
@@ -170,7 +172,11 @@ def _dec_object_key(d: dict[str, Any]) -> ObjectKey:
         kv_rank=d["kv_rank"],
         object_group_id=d.get("object_group_id", 0),
         cache_salt=d.get("cache_salt", ""),
-        extensions=msgspec.convert(d.get("extensions", {}), type=KeyExtensions),
+        identity=msgspec.convert(d.get("identity", ()), type=tuple[KeyAttribute, ...]),
+        metadata=msgspec.convert(d.get("metadata", ()), type=tuple[KeyAttribute, ...]),
+        named_identity=msgspec.convert(
+            d.get("named_identity", ()), type=tuple[KeyAttribute, ...]
+        ),
     )
 
 

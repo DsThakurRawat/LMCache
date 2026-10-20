@@ -12,7 +12,7 @@ import urllib.parse
 # First Party
 from lmcache.utils import CacheEngineKey, LayerCacheEngineKey, parse_cache_key
 from lmcache.v1.distributed.api import ObjectKey
-from lmcache.v1.key_extensions import KeyExtensions
+from lmcache.v1.key_attributes import decode_key_attributes, key_attribute_suffix
 
 RawBlockKeyNamespace = Literal["legacy", "object"]
 
@@ -46,7 +46,7 @@ def object_key_to_string(key: ObjectKey) -> str:
         f"{safe_model}{_KEY_SEP}{key.kv_rank:#010x}"
         f"{_KEY_SEP}{key.object_group_id:x}{_KEY_SEP}{key.chunk_hash.hex()}"
     )
-    return base + key.extensions.storage_suffix(key.cache_salt)
+    return base + key_attribute_suffix(key.cache_salt, key.identity, key.named_identity)
 
 
 def decode_object_key(encoded: str) -> ObjectKey:
@@ -74,13 +74,15 @@ def decode_object_key(encoded: str) -> ObjectKey:
     else:
         raise ValueError(f"Invalid raw-block ObjectKey encoding: {encoded!r}")
 
+    identity, named_identity = decode_key_attributes(extension_token)
     return ObjectKey(
         chunk_hash=bytes.fromhex(chunk_hash_hex),
         model_name=urllib.parse.unquote(safe_model),
         kv_rank=int(kv_rank_str, 16),
         object_group_id=int(object_group_str, 16),
         cache_salt=cache_salt,
-        extensions=KeyExtensions.from_storage_token(extension_token),
+        identity=identity,
+        named_identity=named_identity,
     )
 
 

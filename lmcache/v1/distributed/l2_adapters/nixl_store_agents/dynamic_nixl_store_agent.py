@@ -20,6 +20,7 @@ from nixl._api import nixlBind
 # First Party
 from lmcache.v1.distributed.api import ObjectKey
 from lmcache.v1.distributed.internal_api import L1MemoryDesc
+from lmcache.v1.key_attributes import key_attribute_suffix
 
 
 def _object_key_to_filename(key: ObjectKey) -> str:
@@ -37,7 +38,7 @@ def _object_key_to_filename(key: ObjectKey) -> str:
     """
     safe_model_name = key.model_name.replace("/", "--")
     chunk_hex = key.chunk_hash.hex()
-    salt_suffix = key.extensions.storage_suffix(key.cache_salt)
+    salt_suffix = key_attribute_suffix(key.cache_salt, key.identity, key.named_identity)
     return (
         f"{safe_model_name}_{key.kv_rank:08x}_"
         f"{key.object_group_id:x}_{chunk_hex}{salt_suffix}.bin"

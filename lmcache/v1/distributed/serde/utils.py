@@ -52,5 +52,7 @@ def make_temp_key(original_key: ObjectKey) -> ObjectKey:
         kv_rank=original_key.kv_rank,
         object_group_id=original_key.object_group_id,
         cache_salt=original_key.cache_salt,
-        extensions=original_key.extensions,
+        identity=original_key.identity,
+        metadata=original_key.metadata,
+        named_identity=original_key.named_identity,
     )

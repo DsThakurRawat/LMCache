@@ -51,7 +51,7 @@ from lmcache.v1.distributed.l2_adapters.config import (
 from lmcache.v1.distributed.l2_adapters.factory import (
     register_l2_adapter_factory,
 )
-from lmcache.v1.key_extensions import KeyExtensions
+from lmcache.v1.key_attributes import decode_key_attributes, key_attribute_suffix
 from lmcache.v1.platform import create_event_notifier
 
 logger = init_logger(__name__)
@@ -107,13 +107,15 @@ def _string_to_object_key(name: str) -> ObjectKey:
         raise ValueError(
             f"unparsable S3 object name {name!r}: bad chunk_hash {chunk_hash_hex!r}"
         ) from exc
+    identity, named_identity = decode_key_attributes(extension_token)
     return ObjectKey(
         chunk_hash=chunk_hash,
         model_name=model_name,
         kv_rank=kv_rank,
         object_group_id=object_group_id,
         cache_salt=cache_salt,
-        extensions=KeyExtensions.from_storage_token(extension_token),
+        identity=identity,
+        named_identity=named_identity,
     )
 
 
@@ -191,7 +193,7 @@ def _object_key_to_string(key: ObjectKey) -> str:
         f"{key.model_name}@{key.kv_rank:08x}"
         f"@{key.object_group_id:x}@{key.chunk_hash.hex()}"
     )
-    return base + key.extensions.storage_suffix(key.cache_salt)
+    return base + key_attribute_suffix(key.cache_salt, key.identity, key.named_identity)
 
 
 def _format_safe_path(key_str: str) -> str:
