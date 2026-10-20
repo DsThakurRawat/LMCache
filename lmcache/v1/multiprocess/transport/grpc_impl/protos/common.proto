@@ -6,10 +6,14 @@ syntax = "proto3";
 
 package lmcache.mp;
 
-// Names and values are strings; producers own their typed schema.
-message KeyAttribute {
-  string name = 1;
-  string value = 2;
+message KVCacheEncoding {
+  string dtype = 1;
+  string layout = 2;
+}
+
+message CacheNamespace {
+  optional KVCacheEncoding kv_encoding = 1;
+  map<string, string> tags = 2;
 }
 
 // Cache key used by engine and CacheBlend RPCs.
@@ -24,9 +28,7 @@ message IpcCacheServerKey {
   string cache_salt = 8;
   optional bytes encoded_request_configs = 9;
   int64 num_kv_readers = 10;
-  repeated KeyAttribute opaque_identity = 11;
-  repeated KeyAttribute metadata = 12;
-  repeated KeyAttribute identity_metadata = 13;
+  CacheNamespace namespace = 11;
 }
 
 // Store / Retrieve and CacheBlend retrieve share this reply shape.

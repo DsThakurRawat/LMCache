@@ -14,9 +14,7 @@ message ObjectKey {
   int64 kv_rank = 3;
   int64 object_group_id = 4;
   string cache_salt = 5;
-  repeated KeyAttribute opaque_identity = 6;
-  repeated KeyAttribute metadata = 7;
-  repeated KeyAttribute identity_metadata = 8;
+  CacheNamespace namespace = 6;
 }
 
 message TensorShape {

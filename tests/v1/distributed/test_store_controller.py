@@ -22,6 +22,7 @@ import torch
 
 # First Party
 from lmcache import torch_dev, torch_device_type
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.config import L1ManagerConfig, L1MemoryManagerConfig
 from lmcache.v1.distributed.error import L1Error
@@ -44,7 +45,6 @@ from lmcache.v1.distributed.storage_controllers.store_policy import (
     StorePolicy,
 )
 from lmcache.v1.distributed.storage_controllers.utils import L2AdapterDescriptor
-from lmcache.v1.key_attributes import KeyAttribute
 from lmcache.v1.memory_management import MemoryObj
 from tests.v1.distributed.utils import should_use_lazy_alloc
 
@@ -805,10 +805,10 @@ class TestBufferOnlyMode:
         adapter.close()
 
 
-def test_matching_extensions_split_store_batches(
+def test_namespace_splits_store_batches(
     l1_manager: L1Manager, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A single queued write splits incompatible identities, but not hints."""
+    """A single queued write batches chunks only within the same namespace."""
     adapter = make_adapter()
     batches: list[list[ObjectKey]] = []
     submit = adapter.submit_store_task
@@ -826,20 +826,18 @@ def test_matching_extensions_split_store_batches(
     )
     base = replace(
         make_object_key(0),
-        opaque_identity=(KeyAttribute("dtype", "bf16"),),
-        metadata=(KeyAttribute("trace", "a"),),
+        namespace=CacheNamespace(tags={"dtype": "bf16"}),
     )
     keys = [
         base,
         replace(
             base,
             chunk_hash=ObjectKey.IntHash2Bytes(1),
-            opaque_identity=(KeyAttribute("dtype", "fp8"),),
+            namespace=CacheNamespace(tags={"dtype": "fp8"}),
         ),
         replace(
             base,
             chunk_hash=ObjectKey.IntHash2Bytes(2),
-            metadata=(KeyAttribute("trace", "b"),),
         ),
     ]
     try:
@@ -848,10 +846,7 @@ def test_matching_extensions_split_store_batches(
         ctrl.start()
         assert wait_for_condition(lambda: adapter.debug_get_stored_object_count() == 3)
         assert sorted(len(batch) for batch in batches) == [1, 2]
-        assert all(
-            len({(key.opaque_identity, key.identity_metadata) for key in batch}) == 1
-            for batch in batches
-        )
+        assert all(len({key.namespace for key in batch}) == 1 for batch in batches)
     finally:
         ctrl.stop()
         adapter.close()

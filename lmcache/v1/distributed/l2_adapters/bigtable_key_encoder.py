@@ -5,7 +5,6 @@ Bigtable key encoder for translating ObjectKeys to row keys.
 
 # First Party
 from lmcache.v1.distributed.api import ObjectKey
-from lmcache.v1.key_attributes import encode_matching_attributes
 
 
 class BigtableL2KeyEncoder:
@@ -31,27 +30,6 @@ class BigtableL2KeyEncoder:
         Returns:
             The formatted row key as bytes.
         """
-        template = self.template
-        token = encode_matching_attributes(key.opaque_identity, key.identity_metadata)
-        # Strip @{salt} if salt is empty to prevent a trailing @
-        if not key.cache_salt and not token and template.endswith("@{salt}"):
-            template = template[:-7]
-
-        model_name = key.model_name
-        if self.layer_group_size > 0:
-            model_name = f"{model_name}@lg{self.layer_group_size}"
-
-        hash_hex = key.chunk_hash.hex()
-        row_key_str = template.format(
-            hash_prefix=hash_hex[:4],
-            model=model_name,
-            rank=f"{key.kv_rank:08x}",
-            group=f"{key.object_group_id:x}",
-            hash=hash_hex,
-            salt=key.cache_salt,
-        )
-        if hasattr(key, "layer_id"):
-            row_key_str += f"@layer_{key.layer_id}"
-        if token:
-            row_key_str += f"@{token}"
-        return row_key_str.encode("utf-8")
+        return key.format_storage_key(
+            self.template, layer_group_size=self.layer_group_size
+        ).encode("utf-8")

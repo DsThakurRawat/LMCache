@@ -7,20 +7,18 @@ Could be implemented by native code in the future
 """
 
 # Standard
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal, get_args
 import enum
+import urllib.parse
 
 # Third Party
 import torch
 
 # First Party
 from lmcache.logging import init_logger
-from lmcache.v1.key_attributes import (
-    KeyAttribute,
-    canonicalize_key_attributes,
-    validate_key_attribute_names,
-)
+from lmcache.v1.cache_namespace import CacheNamespace
 
 if TYPE_CHECKING:
     # First Party
@@ -141,31 +139,12 @@ class ObjectKey:
     hash, and extension are added.
     """
 
-    opaque_identity: tuple[KeyAttribute, ...] = ()
-    """Matching factors whose values are opaque outside their producer."""
-
-    metadata: tuple[KeyAttribute, ...] = field(default=(), compare=False)
-    """Module-readable values excluded from matching; durability is owner-defined."""
-
-    identity_metadata: tuple[KeyAttribute, ...] = ()
-    """Module-readable values also included in matching."""
+    namespace: CacheNamespace = field(default_factory=CacheNamespace)
 
     _SALT_FORBIDDEN_CHARS = frozenset("@/\\\x00")
     _SALT_MAX_LEN = 128
 
     def __post_init__(self) -> None:
-        validate_key_attribute_names(
-            self.opaque_identity, self.metadata, self.identity_metadata
-        )
-        object.__setattr__(
-            self, "opaque_identity", canonicalize_key_attributes(self.opaque_identity)
-        )
-        object.__setattr__(self, "metadata", canonicalize_key_attributes(self.metadata))
-        object.__setattr__(
-            self,
-            "identity_metadata",
-            canonicalize_key_attributes(self.identity_metadata),
-        )
         if "@" in self.model_name:
             raise ValueError(
                 f"model_name must not contain '@' (got {self.model_name!r})"
@@ -185,6 +164,96 @@ class ObjectKey:
                 f"(got {len(self.cache_salt)})"
             )
 
+    def to_storage_key(self) -> str:
+        """Return the canonical L2 wire key, including the complete namespace."""
+        return self.format_storage_key("{model}@{rank}@{group}@{hash}{suffix}")
+
+    def format_storage_key(
+        self,
+        template: str,
+        *,
+        model_separator: str = "/",
+        rank_format: str = "08x",
+        layer_group_size: int | None = None,
+    ) -> str:
+        """Format an existing backend template without exposing identity fields.
+
+        Templates accept model, quoted_model, rank, group, hash, hash_prefix,
+        salt and suffix.
+        A template without suffix receives the namespace token automatically.
+        Model escaping and rank formatting preserve existing backend names.
+        """
+        token = self.namespace.to_token()
+        if not self.cache_salt and not token and template.endswith("@{salt}"):
+            template = template[:-7]
+        model = self.model_name.replace("/", model_separator)
+        if layer_group_size is not None and layer_group_size > 0:
+            model = f"{model}@lg{layer_group_size}"
+        suffix = f"@{self.cache_salt}" if self.cache_salt else ""
+        if token:
+            suffix = f"@{self.cache_salt}@{token}"
+        result = template.format(
+            model=model,
+            quoted_model=urllib.parse.quote(self.model_name, safe=""),
+            rank=format(self.kv_rank, rank_format),
+            group=f"{self.object_group_id:x}",
+            hash=self.chunk_hash.hex(),
+            hash_prefix=self.chunk_hash.hex()[:4],
+            salt=self.cache_salt,
+            suffix=suffix,
+        )
+        if layer_group_size is not None and hasattr(self, "layer_id"):
+            result += f"@layer_{self.layer_id}"
+        if "{suffix}" not in template and token:
+            result += f"@{token}"
+        return result
+
+    def storage_shard(self) -> tuple[str, str]:
+        """Return two chunk-hash directory components, independent of namespace."""
+        chunk_hex = self.chunk_hash.hex()
+        return chunk_hex[:2], chunk_hex[2:4]
+
+    def to_filename(self) -> str:
+        """Return the native/Python FS filename; reject overlong namespace names."""
+        filename = self.format_storage_key(
+            "{model}@{rank}@{group}@{hash}{suffix}.data",
+            model_separator="-SEP-",
+            rank_format="#010x",
+        )
+        if self.namespace.to_token() and len(filename.encode("utf-8")) > 255:
+            raise ValueError("ObjectKey filename exceeds NAME_MAX (255 bytes)")
+        return filename
+
+    @classmethod
+    def from_storage_key(
+        cls, encoded: str, *, model_decoder: Callable[[str], str] = str
+    ) -> "ObjectKey":
+        """Recover an L2 key; reject malformed fields and namespace encodings."""
+        parts = encoded.split("@")
+        token = parts.pop() if len(parts) == 6 else ""
+        if len(parts) == 4:
+            parts.append("")
+        if len(parts) != 5:
+            raise ValueError("invalid ObjectKey encoding: expected 4, 5 or 6 fields")
+        model, rank, group, chunk_hash, salt = parts
+        return cls(
+            chunk_hash=bytes.fromhex(chunk_hash),
+            model_name=model_decoder(model),
+            kv_rank=int(rank, 16),
+            object_group_id=int(group, 16),
+            cache_salt=salt,
+            namespace=CacheNamespace.from_token(token),
+        )
+
+    @classmethod
+    def from_filename(cls, filename: str) -> "ObjectKey":
+        """Recover an ObjectKey from a Python/native FS data filename."""
+        if not filename.endswith(".data"):
+            raise ValueError("invalid ObjectKey filename extension")
+        return cls.from_storage_key(
+            filename[:-5], model_decoder=lambda model: model.replace("-SEP-", "/")
+        )
+
     def to_encoded_object_key(self) -> "EncodedObjectKey":
         """Return the JSON-safe :class:`EncodedObjectKey` projection."""
         return EncodedObjectKey(
@@ -193,9 +262,7 @@ class ObjectKey:
             kv_rank=self.kv_rank,
             object_group_id=self.object_group_id,
             cache_salt=self.cache_salt,
-            opaque_identity=self.opaque_identity,
-            metadata=self.metadata,
-            identity_metadata=self.identity_metadata,
+            namespace=self.namespace,
         )
 
     @staticmethod
@@ -291,28 +358,7 @@ class EncodedObjectKey:
 
     cache_salt: str = ""
 
-    opaque_identity: tuple[KeyAttribute, ...] = ()
-    """Matching factors whose values are opaque outside their producer."""
-
-    metadata: tuple[KeyAttribute, ...] = field(default=(), compare=False)
-    """Module-readable values excluded from matching; durability is owner-defined."""
-
-    identity_metadata: tuple[KeyAttribute, ...] = ()
-    """Module-readable values also included in matching."""
-
-    def __post_init__(self) -> None:
-        validate_key_attribute_names(
-            self.opaque_identity, self.metadata, self.identity_metadata
-        )
-        object.__setattr__(
-            self, "opaque_identity", canonicalize_key_attributes(self.opaque_identity)
-        )
-        object.__setattr__(self, "metadata", canonicalize_key_attributes(self.metadata))
-        object.__setattr__(
-            self,
-            "identity_metadata",
-            canonicalize_key_attributes(self.identity_metadata),
-        )
+    namespace: CacheNamespace = field(default_factory=CacheNamespace)
 
     def to_object_key(self) -> ObjectKey:
         """Recover the corresponding :class:`ObjectKey`.
@@ -327,9 +373,7 @@ class EncodedObjectKey:
             kv_rank=self.kv_rank,
             object_group_id=self.object_group_id,
             cache_salt=self.cache_salt,
-            opaque_identity=self.opaque_identity,
-            metadata=self.metadata,
-            identity_metadata=self.identity_metadata,
+            namespace=self.namespace,
         )
 
 
@@ -702,9 +746,7 @@ def ipc_key_to_object_keys(
                 kv_rank=kv_rank,
                 object_group_id=object_group_id,
                 cache_salt=cache_salt,
-                opaque_identity=ipc_key.opaque_identity,
-                metadata=ipc_key.metadata,
-                identity_metadata=ipc_key.identity_metadata,
+                namespace=ipc_key.namespace,
             )
             for chunk_hash in chunk_hashes
             for kv_rank in kv_ranks
@@ -774,9 +816,7 @@ def ipc_key_to_grouped_object_keys(
                             kv_rank=kv_rank,
                             object_group_id=object_group_id,
                             cache_salt=ipc_key.cache_salt,
-                            opaque_identity=ipc_key.opaque_identity,
-                            metadata=ipc_key.metadata,
-                            identity_metadata=ipc_key.identity_metadata,
+                            namespace=ipc_key.namespace,
                         )
                         for chunk_hash in chunk_hashes
                     ],

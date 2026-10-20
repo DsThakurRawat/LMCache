@@ -30,7 +30,6 @@ from lmcache.v1.distributed.l2_adapters.sagemaker_hyperpod_client import (
     SageMakerHyperPodClient,
     SageMakerHyperPodLease,
 )
-from lmcache.v1.key_attributes import matching_attributes_suffix
 from lmcache.v1.memory_management import MemoryObj
 from lmcache.v1.platform import create_event_notifier
 
@@ -38,23 +37,8 @@ logger = init_logger(__name__)
 
 
 def _wire_key(key: ObjectKey) -> str:
-    """Serialize an MP ``ObjectKey`` to an ai-toolkit object name.
-
-    Unsalted::
-
-        <model_name>@<kv_rank_hex8>@<object_group_id_hex>@<chunk_hash_hex>
-
-    Salted (trailing ``cache_salt``)::
-
-        <model_name>@<kv_rank_hex8>@<object_group_id_hex>@<chunk_hash_hex>@<cache_salt>
-    """
-    base = (
-        f"{key.model_name}@{key.kv_rank:08x}"
-        f"@{key.object_group_id:x}@{key.chunk_hash.hex()}"
-    )
-    return base + matching_attributes_suffix(
-        key.cache_salt, key.opaque_identity, key.identity_metadata
-    )
+    """Return the shared L2 storage key."""
+    return key.to_storage_key()
 
 
 class SageMakerHyperPodL2AdapterConfig(L2AdapterConfigBase):

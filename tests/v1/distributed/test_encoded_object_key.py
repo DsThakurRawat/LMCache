@@ -81,9 +81,7 @@ class TestRoundTrip:
             "kv_rank": 0,
             "object_group_id": 1,
             "cache_salt": "x",
-            "opaque_identity": (),
-            "metadata": (),
-            "identity_metadata": (),
+            "namespace": {"kv_encoding": None, "tags": {}},
         }
 
 

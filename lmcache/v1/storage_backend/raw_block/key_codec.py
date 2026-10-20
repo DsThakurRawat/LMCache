@@ -12,14 +12,9 @@ import urllib.parse
 # First Party
 from lmcache.utils import CacheEngineKey, LayerCacheEngineKey, parse_cache_key
 from lmcache.v1.distributed.api import ObjectKey
-from lmcache.v1.key_attributes import (
-    decode_matching_attributes,
-    matching_attributes_suffix,
-)
 
 RawBlockKeyNamespace = Literal["legacy", "object"]
 
-_KEY_SEP = "@"
 _UINT64_MASK = (1 << 64) - 1
 
 
@@ -39,18 +34,11 @@ def object_key_to_string(key: ObjectKey) -> str:
 
     Returns:
         A stable string containing model name, KV rank, object group id,
-        chunk hash, optional cache salt and matching extension attributes.
+        chunk hash, optional cache salt and cache namespace.
 
-    Raises:
-        AttributeError: If ``key`` does not expose the ObjectKey fields.
     """
-    safe_model = urllib.parse.quote(key.model_name, safe="")
-    base = (
-        f"{safe_model}{_KEY_SEP}{key.kv_rank:#010x}"
-        f"{_KEY_SEP}{key.object_group_id:x}{_KEY_SEP}{key.chunk_hash.hex()}"
-    )
-    return base + matching_attributes_suffix(
-        key.cache_salt, key.opaque_identity, key.identity_metadata
+    return key.format_storage_key(
+        "{quoted_model}@{rank}@{group}@{hash}{suffix}", rank_format="#010x"
     )
 
 
@@ -67,28 +55,7 @@ def decode_object_key(encoded: str) -> ObjectKey:
         ValueError: If the encoded string has an unexpected shape or invalid
             hexadecimal chunk hash.
     """
-    parts = encoded.split(_KEY_SEP)
-    extension_token = ""
-    if len(parts) == 6:
-        extension_token = parts.pop()
-    if len(parts) == 4:
-        safe_model, kv_rank_str, object_group_str, chunk_hash_hex = parts
-        cache_salt = ""
-    elif len(parts) == 5:
-        safe_model, kv_rank_str, object_group_str, chunk_hash_hex, cache_salt = parts
-    else:
-        raise ValueError(f"Invalid raw-block ObjectKey encoding: {encoded!r}")
-
-    opaque_identity, identity_metadata = decode_matching_attributes(extension_token)
-    return ObjectKey(
-        chunk_hash=bytes.fromhex(chunk_hash_hex),
-        model_name=urllib.parse.unquote(safe_model),
-        kv_rank=int(kv_rank_str, 16),
-        object_group_id=int(object_group_str, 16),
-        cache_salt=cache_salt,
-        opaque_identity=opaque_identity,
-        identity_metadata=identity_metadata,
-    )
+    return ObjectKey.from_storage_key(encoded, model_decoder=urllib.parse.unquote)
 
 
 def encode_object_key(key: ObjectKey) -> RawBlockKeySpec:

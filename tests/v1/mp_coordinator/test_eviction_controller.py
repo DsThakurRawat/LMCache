@@ -12,9 +12,9 @@ import httpx
 import pytest
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import ObjectKey, Tier
 from lmcache.v1.distributed.quota_manager import QuotaManager
-from lmcache.v1.key_attributes import KeyAttribute
 from lmcache.v1.mp_coordinator.api import (
     CacheEventBatch,
     CacheEventEntry,
@@ -389,9 +389,7 @@ async def test_execute_evictions_dispatches_to_registered_instance():
                 "kv_rank": 0,
                 "object_group_id": 0,
                 "cache_salt": "alice",
-                "opaque_identity": [],
-                "metadata": [],
-                "identity_metadata": [],
+                "namespace": {"kv_encoding": None, "tags": {}},
             }
         ]
     }
@@ -1005,15 +1003,14 @@ def test_restored_pins_on_other_groups_merge_into_one_entry():
     assert ctrl.filter_unpinned([k]) == [k]
 
 
-def test_pin_capture_restore_keeps_matching_extensions() -> None:
+def test_pin_capture_restore_keeps_namespace() -> None:
     source, _, _ = _setup()
     key = replace(
         _make_key("tenant"),
-        opaque_identity=(KeyAttribute("dtype", "bf16"),),
-        identity_metadata=(KeyAttribute("codec", "raw-v1"),),
+        namespace=CacheNamespace(tags={"dtype": "bf16"}),
     )
     source.pin([key])
     restored, _, _ = _setup()
     restored.restore(source.capture())
-    incompatible = replace(key, opaque_identity=(KeyAttribute("dtype", "fp8"),))
+    incompatible = replace(key, namespace=CacheNamespace(tags={"dtype": "fp8"}))
     assert restored.filter_unpinned([key, incompatible]) == [incompatible]

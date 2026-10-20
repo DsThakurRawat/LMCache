@@ -8,11 +8,7 @@ import msgspec
 import torch
 
 # First Party
-from lmcache.v1.key_attributes import (
-    KeyAttribute,
-    canonicalize_key_attributes,
-    validate_key_attribute_names,
-)
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.platform.base.ipc_wrapper import (  # noqa: E402,F401
     DeviceIPCWrapper,
 )
@@ -74,14 +70,7 @@ class IPCCacheServerKey:
     # lookups reject it.
     num_kv_readers: int = field(default=0, compare=False)
 
-    opaque_identity: tuple[KeyAttribute, ...] = ()
-    """Matching factors whose values are opaque outside their producer."""
-
-    metadata: tuple[KeyAttribute, ...] = field(default=(), compare=False)
-    """Module-readable values excluded from matching; durability is owner-defined."""
-
-    identity_metadata: tuple[KeyAttribute, ...] = ()
-    """Module-readable values also included in matching."""
+    namespace: CacheNamespace = field(default_factory=CacheNamespace)
 
     # Duplicated from ObjectKey — cannot import ObjectKey here due to
     # circular dependency (api.py imports IPCCacheServerKey).
@@ -89,18 +78,6 @@ class IPCCacheServerKey:
     _SALT_MAX_LEN = 128
 
     def __post_init__(self) -> None:
-        validate_key_attribute_names(
-            self.opaque_identity, self.metadata, self.identity_metadata
-        )
-        object.__setattr__(
-            self, "opaque_identity", canonicalize_key_attributes(self.opaque_identity)
-        )
-        object.__setattr__(self, "metadata", canonicalize_key_attributes(self.metadata))
-        object.__setattr__(
-            self,
-            "identity_metadata",
-            canonicalize_key_attributes(self.identity_metadata),
-        )
         bad = self._SALT_FORBIDDEN_CHARS & set(self.cache_salt)
         if bad:
             raise ValueError(
@@ -126,9 +103,7 @@ class IPCCacheServerKey:
         cache_salt: str = "",
         num_kv_readers: int = 1,
         request_configs: dict[str, Any] | None = None,
-        opaque_identity: tuple[KeyAttribute, ...] = (),
-        metadata: tuple[KeyAttribute, ...] = (),
-        identity_metadata: tuple[KeyAttribute, ...] = (),
+        namespace: CacheNamespace | None = None,
     ) -> "IPCCacheServerKey":
         """Create a key from token ids. Only used by the tests."""
         return cls(
@@ -142,9 +117,7 @@ class IPCCacheServerKey:
             request_id=request_id,
             cache_salt=cache_salt,
             request_configs=request_configs,
-            opaque_identity=opaque_identity,
-            metadata=metadata,
-            identity_metadata=identity_metadata,
+            namespace=namespace if namespace is not None else CacheNamespace(),
         )
 
     def require_num_kv_readers(self) -> int:
@@ -177,9 +150,7 @@ class IPCCacheServerKey:
             request_id=self.request_id,
             cache_salt=self.cache_salt,
             request_configs=self.request_configs,
-            opaque_identity=self.opaque_identity,
-            metadata=self.metadata,
-            identity_metadata=self.identity_metadata,
+            namespace=self.namespace,
         )
 
 

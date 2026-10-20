@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Recovery and backend key naming preserve extensible opaque_identity."""
+"""Recovery and backend key naming preserve cache namespaces."""
 
 # Standard
 from dataclasses import replace
@@ -11,6 +11,7 @@ import subprocess
 import pytest
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace, KVCacheEncoding
 from lmcache.v1.distributed.api import ObjectKey
 from lmcache.v1.distributed.l2_adapters.bigtable_key_encoder import BigtableL2KeyEncoder
 from lmcache.v1.distributed.l2_adapters.fs_l2_adapter import (
@@ -27,7 +28,6 @@ from lmcache.v1.distributed.l2_adapters.s3_l2_adapter import (
     _string_to_object_key,
 )
 from lmcache.v1.distributed.serde.utils import make_temp_key
-from lmcache.v1.key_attributes import KeyAttribute, encode_matching_attributes
 from lmcache.v1.mp_observability.trace.codecs import decode_value, encode_value
 
 
@@ -38,12 +38,9 @@ def test_backend_names_recovery_and_trace(salt: str) -> None:
         "org/model",
         1,
         cache_salt=salt,
-        opaque_identity=(KeyAttribute("dtype", "bf16"),),
-        metadata=(KeyAttribute("trace", "a"),),
-        identity_metadata=(KeyAttribute("codec", "raw-v1"),),
+        namespace=CacheNamespace(KVCacheEncoding("bf16", "NHD"), {"v": "1"}),
     )
-    hint = replace(key, metadata=(KeyAttribute("trace", "b"),))
-    other = replace(key, opaque_identity=(KeyAttribute("dtype", "fp8"),))
+    other = replace(key, namespace=CacheNamespace(tags={"dtype": "fp8"}))
     for encode in (
         _object_key_to_filename,
         _object_key_to_string,
@@ -51,27 +48,24 @@ def test_backend_names_recovery_and_trace(salt: str) -> None:
         BigtableL2KeyEncoder().encode_row_key,
         BigtableL2KeyEncoder("{model}@{hash}").encode_row_key,
     ):
-        assert encode(key) == encode(hint)
         assert encode(key) != encode(other)
     for recovered in (
         _filename_to_object_key(_object_key_to_filename(key)),
         _string_to_object_key(s3_name(key)),
     ):
         assert recovered == key
-        assert recovered.metadata == ()
-        assert recovered.identity_metadata == key.identity_metadata
+        assert recovered.namespace == key.namespace
     temp = make_temp_key(key)
-    assert temp.metadata == key.metadata
-    assert temp.identity_metadata == key.identity_metadata
+    assert temp.namespace == key.namespace
     assert temp.chunk_hash != key.chunk_hash
     traced = decode_value(encode_value(key))
     assert traced == key
-    assert traced.metadata == key.metadata
+    assert traced.namespace == key.namespace
 
 
-def test_fs_rejects_invalid_or_overlong_extension() -> None:
+def test_fs_rejects_invalid_or_overlong_namespace() -> None:
     key = ObjectKey(
-        b"1234", "model", 1, opaque_identity=(KeyAttribute("large", "a" * 200),)
+        b"1234", "model", 1, namespace=CacheNamespace(tags={"large": "a" * 200})
     )
     with pytest.raises(ValueError, match="NAME_MAX"):
         _object_key_to_filename(key)
@@ -103,13 +97,13 @@ int main(int argc, char** argv) {
         capture_output=True,
     )
     for salt in ("", "tenant"):
-        for opaque_identity in ((), (KeyAttribute("dtype", "bf16"),)):
+        for namespace in (CacheNamespace(), CacheNamespace(tags={"dtype": "bf16"})):
             key = ObjectKey(
                 b"1234",
                 "org/model",
                 1,
                 cache_salt=salt,
-                opaque_identity=opaque_identity,
+                namespace=namespace,
             )
             wire = _object_key_to_string(key)
             result = subprocess.check_output(
@@ -120,12 +114,12 @@ int main(int argc, char** argv) {
 
 def test_bigtable_extended_unsalted_cannot_alias_legacy_salt() -> None:
     extended = ObjectKey(
-        b"1234", "model", 1, opaque_identity=(KeyAttribute("dtype", "bf16"),)
+        b"1234", "model", 1, namespace=CacheNamespace(tags={"dtype": "bf16"})
     )
     legacy = replace(
         extended,
-        opaque_identity=(),
-        cache_salt=encode_matching_attributes(extended.opaque_identity, ()),
+        namespace=CacheNamespace(),
+        cache_salt=extended.namespace.to_token(),
     )
     encoder = BigtableL2KeyEncoder()
     assert encoder.encode_row_key(extended) != encoder.encode_row_key(legacy)

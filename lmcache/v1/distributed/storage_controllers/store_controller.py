@@ -20,6 +20,7 @@ import weakref
 
 # First Party
 from lmcache.logging import init_logger
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import ObjectKey
 from lmcache.v1.distributed.error import L1Error
 from lmcache.v1.distributed.internal_api import L1ManagerInterface, L1ManagerListener
@@ -33,7 +34,6 @@ from lmcache.v1.distributed.storage_controllers.store_policy import (
     StorePolicy,
 )
 from lmcache.v1.distributed.storage_controllers.utils import L2AdapterDescriptor
-from lmcache.v1.key_attributes import KeyAttribute
 from lmcache.v1.mp_observability.event import Event, EventType
 from lmcache.v1.mp_observability.event_bus import get_event_bus
 from lmcache.v1.mp_observability.otel_init import register_gauge
@@ -50,26 +50,14 @@ STORE_LOOP_POLL_TIMEOUT_MS = 500
 
 def _group_keys_by_shape(
     keys: list[ObjectKey],
-) -> dict[
-    tuple[str, int, tuple[KeyAttribute, ...], tuple[KeyAttribute, ...]], list[ObjectKey]
-]:
-    """Group ``keys`` by the fields that determine their KV cache shape.
-
-    Each bucket shares a single ``(shape, dtype)``, so each bucket can be
-    submitted as one ``submit_store_task`` call. Today the shape is pinned
-    by model/rank and both matching attribute collections. ``kv_rank`` packs
-    world size and parallelism config, so different TP/PP setups land in
-    different buckets. Matching attributes may describe precision or layout
-    and must also agree; metadata-only differences do not split store batches.
-    """
+) -> dict[tuple[str, int, CacheNamespace], list[ObjectKey]]:
+    """Group by model, rank and namespace so each batch has one representation."""
     groups: dict[
-        tuple[str, int, tuple[KeyAttribute, ...], tuple[KeyAttribute, ...]],
+        tuple[str, int, CacheNamespace],
         list[ObjectKey],
     ] = defaultdict(list)
     for key in keys:
-        groups[
-            (key.model_name, key.kv_rank, key.opaque_identity, key.identity_metadata)
-        ].append(key)
+        groups[(key.model_name, key.kv_rank, key.namespace)].append(key)
     return groups
 
 

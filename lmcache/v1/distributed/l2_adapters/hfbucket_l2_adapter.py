@@ -40,7 +40,6 @@ from lmcache.v1.distributed.l2_adapters.config import (
 from lmcache.v1.distributed.l2_adapters.factory import (
     register_l2_adapter_factory,
 )
-from lmcache.v1.key_attributes import matching_attributes_suffix
 from lmcache.v1.platform import create_event_notifier
 from lmcache.v1.storage_backend.connector.hfbucket_connector import (
     HFBucketClient,
@@ -80,23 +79,8 @@ class _PartialStoreFailure(RuntimeError):
 
 
 def _object_key_to_string(key: ObjectKey) -> str:
-    """Serialize an MP ``ObjectKey`` to the shared L2 object-name format.
-
-    Unsalted keys use
-    ``<model_name>@<kv_rank_hex>@<object_group_id_hex>@<chunk_hash_hex>``. Salted
-    keys append ``@<cache_salt>`` so tenants/users with identical token chunks
-    do not collide in the backing bucket.
-
-    Matching extensions append ``@<salt>@x1-<identity>`` to the core
-    name; request metadata never changes the storage name.
-    """
-    base = (
-        f"{key.model_name}@{key.kv_rank:08x}"
-        f"@{key.object_group_id:x}@{key.chunk_hash.hex()}"
-    )
-    return base + matching_attributes_suffix(
-        key.cache_salt, key.opaque_identity, key.identity_metadata
-    )
+    """Return the shared L2 storage key."""
+    return key.to_storage_key()
 
 
 def _object_key_to_bucket_path(key: ObjectKey, location: HFBucketLocation) -> str:

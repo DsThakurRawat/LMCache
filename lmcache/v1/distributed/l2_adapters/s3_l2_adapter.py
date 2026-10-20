@@ -51,10 +51,6 @@ from lmcache.v1.distributed.l2_adapters.config import (
 from lmcache.v1.distributed.l2_adapters.factory import (
     register_l2_adapter_factory,
 )
-from lmcache.v1.key_attributes import (
-    decode_matching_attributes,
-    matching_attributes_suffix,
-)
 from lmcache.v1.platform import create_event_notifier
 
 logger = init_logger(__name__)
@@ -66,60 +62,8 @@ logger = init_logger(__name__)
 
 
 def _string_to_object_key(name: str) -> ObjectKey:
-    """Reverse of :func:`_object_key_to_string`.
-
-    Expects
-    ``<model_name>@<kv_rank_hex>@<object_group_id_hex>@<chunk_hash_hex>[@<cache_salt>]``.
-
-    Raises:
-        ValueError: ``name`` does not match the expected format.
-    """
-    parts = name.split("@")
-    extension_token = ""
-    if len(parts) == 6:
-        extension_token = parts.pop()
-    if len(parts) == 4:
-        model_name, kv_rank_hex, object_group_id_hex, chunk_hash_hex = parts
-        cache_salt = ""
-    elif len(parts) == 5:
-        (
-            model_name,
-            kv_rank_hex,
-            object_group_id_hex,
-            chunk_hash_hex,
-            cache_salt,
-        ) = parts
-    else:
-        raise ValueError(f"unparsable S3 object name {name!r}: wrong field count")
-    try:
-        kv_rank = int(kv_rank_hex, 16)
-    except ValueError as exc:
-        raise ValueError(
-            f"unparsable S3 object name {name!r}: bad kv_rank {kv_rank_hex!r}"
-        ) from exc
-    try:
-        object_group_id = int(object_group_id_hex, 16)
-    except ValueError as exc:
-        raise ValueError(
-            f"unparsable S3 object name {name!r}: "
-            f"bad object_group_id {object_group_id_hex!r}"
-        ) from exc
-    try:
-        chunk_hash = bytes.fromhex(chunk_hash_hex)
-    except ValueError as exc:
-        raise ValueError(
-            f"unparsable S3 object name {name!r}: bad chunk_hash {chunk_hash_hex!r}"
-        ) from exc
-    opaque_identity, identity_metadata = decode_matching_attributes(extension_token)
-    return ObjectKey(
-        chunk_hash=chunk_hash,
-        model_name=model_name,
-        kv_rank=kv_rank,
-        object_group_id=object_group_id,
-        cache_salt=cache_salt,
-        opaque_identity=opaque_identity,
-        identity_metadata=identity_metadata,
-    )
+    """Recover an ObjectKey from its L2 storage name."""
+    return ObjectKey.from_storage_key(name)
 
 
 def _parse_list_response_xml(
@@ -176,29 +120,8 @@ def _parse_list_response_xml(
 
 
 def _object_key_to_string(key: ObjectKey) -> str:
-    """Serialize an ObjectKey to a deterministic S3 object name.
-
-    Unsalted::
-
-        <model_name>@<kv_rank_hex>@<object_group_id_hex>@<chunk_hash_hex>
-
-    Salted (trailing ``cache_salt``)::
-
-        <model_name>@<kv_rank_hex>@<object_group_id_hex>@<chunk_hash_hex>@<cache_salt>
-
-    ``@`` in ``model_name`` and ``cache_salt`` is rejected by
-    ``ObjectKey.__post_init__``, so the format is unambiguous.
-
-    Matching extensions append ``@<salt>@x1-<identity>`` to the core
-    name; request metadata never changes the storage name.
-    """
-    base = (
-        f"{key.model_name}@{key.kv_rank:08x}"
-        f"@{key.object_group_id:x}@{key.chunk_hash.hex()}"
-    )
-    return base + matching_attributes_suffix(
-        key.cache_salt, key.opaque_identity, key.identity_metadata
-    )
+    """Return the shared L2 storage key."""
+    return key.to_storage_key()
 
 
 def _format_safe_path(key_str: str) -> str:
@@ -336,7 +259,7 @@ class S3L2AdapterConfig(L2AdapterConfigBase):
       resolver, which may still issue HTTPS calls.
     - aws_access_key_id / aws_secret_access_key (str): optional static
       credentials. When unset, credentials are resolved through boto3
-      (env vars, profile, container, web-opaque_identity, IMDS).
+      (env vars, profile, container, web-identity, IMDS).
     - max_capacity_gb (float): aggregate capacity used by
       ``get_usage()``; ``0`` disables aggregate eviction
       (``usage_fraction == -1.0``).
