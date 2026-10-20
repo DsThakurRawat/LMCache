@@ -30,7 +30,7 @@ from lmcache.v1.distributed.l2_adapters.sagemaker_hyperpod_client import (
     SageMakerHyperPodClient,
     SageMakerHyperPodLease,
 )
-from lmcache.v1.key_attributes import key_attribute_suffix
+from lmcache.v1.key_attributes import matching_attributes_suffix
 from lmcache.v1.memory_management import MemoryObj
 from lmcache.v1.platform import create_event_notifier
 
@@ -52,7 +52,9 @@ def _wire_key(key: ObjectKey) -> str:
         f"{key.model_name}@{key.kv_rank:08x}"
         f"@{key.object_group_id:x}@{key.chunk_hash.hex()}"
     )
-    return base + key_attribute_suffix(key.cache_salt, key.identity, key.named_identity)
+    return base + matching_attributes_suffix(
+        key.cache_salt, key.opaque_identity, key.identity_metadata
+    )
 
 
 class SageMakerHyperPodL2AdapterConfig(L2AdapterConfigBase):

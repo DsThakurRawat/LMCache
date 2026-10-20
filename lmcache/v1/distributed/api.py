@@ -16,7 +16,11 @@ import torch
 
 # First Party
 from lmcache.logging import init_logger
-from lmcache.v1.key_attributes import KeyAttribute, canonicalize_key_attributes
+from lmcache.v1.key_attributes import (
+    KeyAttribute,
+    canonicalize_key_attributes,
+    validate_key_attribute_names,
+)
 
 if TYPE_CHECKING:
     # First Party
@@ -137,23 +141,30 @@ class ObjectKey:
     hash, and extension are added.
     """
 
-    identity: tuple[KeyAttribute, ...] = ()
-    """Named attributes used for matching only."""
+    opaque_identity: tuple[KeyAttribute, ...] = ()
+    """Matching factors whose values are opaque outside their producer."""
 
     metadata: tuple[KeyAttribute, ...] = field(default=(), compare=False)
-    """Operation metadata excluded from equality, hashing and ordering."""
+    """Module-readable values excluded from matching; durability is owner-defined."""
 
-    named_identity: tuple[KeyAttribute, ...] = ()
-    """Matching attributes also interpreted by other modules."""
+    identity_metadata: tuple[KeyAttribute, ...] = ()
+    """Module-readable values also included in matching."""
 
     _SALT_FORBIDDEN_CHARS = frozenset("@/\\\x00")
     _SALT_MAX_LEN = 128
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "identity", canonicalize_key_attributes(self.identity))
+        validate_key_attribute_names(
+            self.opaque_identity, self.metadata, self.identity_metadata
+        )
+        object.__setattr__(
+            self, "opaque_identity", canonicalize_key_attributes(self.opaque_identity)
+        )
         object.__setattr__(self, "metadata", canonicalize_key_attributes(self.metadata))
         object.__setattr__(
-            self, "named_identity", canonicalize_key_attributes(self.named_identity)
+            self,
+            "identity_metadata",
+            canonicalize_key_attributes(self.identity_metadata),
         )
         if "@" in self.model_name:
             raise ValueError(
@@ -182,9 +193,9 @@ class ObjectKey:
             kv_rank=self.kv_rank,
             object_group_id=self.object_group_id,
             cache_salt=self.cache_salt,
-            identity=self.identity,
+            opaque_identity=self.opaque_identity,
             metadata=self.metadata,
-            named_identity=self.named_identity,
+            identity_metadata=self.identity_metadata,
         )
 
     @staticmethod
@@ -280,20 +291,27 @@ class EncodedObjectKey:
 
     cache_salt: str = ""
 
-    identity: tuple[KeyAttribute, ...] = ()
-    """Named attributes used for matching only."""
+    opaque_identity: tuple[KeyAttribute, ...] = ()
+    """Matching factors whose values are opaque outside their producer."""
 
     metadata: tuple[KeyAttribute, ...] = field(default=(), compare=False)
-    """Operation metadata excluded from equality, hashing and ordering."""
+    """Module-readable values excluded from matching; durability is owner-defined."""
 
-    named_identity: tuple[KeyAttribute, ...] = ()
-    """Matching attributes also interpreted by other modules."""
+    identity_metadata: tuple[KeyAttribute, ...] = ()
+    """Module-readable values also included in matching."""
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "identity", canonicalize_key_attributes(self.identity))
+        validate_key_attribute_names(
+            self.opaque_identity, self.metadata, self.identity_metadata
+        )
+        object.__setattr__(
+            self, "opaque_identity", canonicalize_key_attributes(self.opaque_identity)
+        )
         object.__setattr__(self, "metadata", canonicalize_key_attributes(self.metadata))
         object.__setattr__(
-            self, "named_identity", canonicalize_key_attributes(self.named_identity)
+            self,
+            "identity_metadata",
+            canonicalize_key_attributes(self.identity_metadata),
         )
 
     def to_object_key(self) -> ObjectKey:
@@ -309,9 +327,9 @@ class EncodedObjectKey:
             kv_rank=self.kv_rank,
             object_group_id=self.object_group_id,
             cache_salt=self.cache_salt,
-            identity=self.identity,
+            opaque_identity=self.opaque_identity,
             metadata=self.metadata,
-            named_identity=self.named_identity,
+            identity_metadata=self.identity_metadata,
         )
 
 
@@ -684,9 +702,9 @@ def ipc_key_to_object_keys(
                 kv_rank=kv_rank,
                 object_group_id=object_group_id,
                 cache_salt=cache_salt,
-                identity=ipc_key.identity,
+                opaque_identity=ipc_key.opaque_identity,
                 metadata=ipc_key.metadata,
-                named_identity=ipc_key.named_identity,
+                identity_metadata=ipc_key.identity_metadata,
             )
             for chunk_hash in chunk_hashes
             for kv_rank in kv_ranks
@@ -756,9 +774,9 @@ def ipc_key_to_grouped_object_keys(
                             kv_rank=kv_rank,
                             object_group_id=object_group_id,
                             cache_salt=ipc_key.cache_salt,
-                            identity=ipc_key.identity,
+                            opaque_identity=ipc_key.opaque_identity,
                             metadata=ipc_key.metadata,
-                            named_identity=ipc_key.named_identity,
+                            identity_metadata=ipc_key.identity_metadata,
                         )
                         for chunk_hash in chunk_hashes
                     ],

@@ -51,7 +51,10 @@ from lmcache.v1.distributed.l2_adapters.config import (
 from lmcache.v1.distributed.l2_adapters.factory import (
     register_l2_adapter_factory,
 )
-from lmcache.v1.key_attributes import decode_key_attributes, key_attribute_suffix
+from lmcache.v1.key_attributes import (
+    decode_matching_attributes,
+    matching_attributes_suffix,
+)
 from lmcache.v1.platform import create_event_notifier
 
 logger = init_logger(__name__)
@@ -107,15 +110,15 @@ def _string_to_object_key(name: str) -> ObjectKey:
         raise ValueError(
             f"unparsable S3 object name {name!r}: bad chunk_hash {chunk_hash_hex!r}"
         ) from exc
-    identity, named_identity = decode_key_attributes(extension_token)
+    opaque_identity, identity_metadata = decode_matching_attributes(extension_token)
     return ObjectKey(
         chunk_hash=chunk_hash,
         model_name=model_name,
         kv_rank=kv_rank,
         object_group_id=object_group_id,
         cache_salt=cache_salt,
-        identity=identity,
-        named_identity=named_identity,
+        opaque_identity=opaque_identity,
+        identity_metadata=identity_metadata,
     )
 
 
@@ -193,7 +196,9 @@ def _object_key_to_string(key: ObjectKey) -> str:
         f"{key.model_name}@{key.kv_rank:08x}"
         f"@{key.object_group_id:x}@{key.chunk_hash.hex()}"
     )
-    return base + key_attribute_suffix(key.cache_salt, key.identity, key.named_identity)
+    return base + matching_attributes_suffix(
+        key.cache_salt, key.opaque_identity, key.identity_metadata
+    )
 
 
 def _format_safe_path(key_str: str) -> str:
@@ -331,7 +336,7 @@ class S3L2AdapterConfig(L2AdapterConfigBase):
       resolver, which may still issue HTTPS calls.
     - aws_access_key_id / aws_secret_access_key (str): optional static
       credentials. When unset, credentials are resolved through boto3
-      (env vars, profile, container, web-identity, IMDS).
+      (env vars, profile, container, web-opaque_identity, IMDS).
     - max_capacity_gb (float): aggregate capacity used by
       ``get_usage()``; ``0`` disables aggregate eviction
       (``usage_fraction == -1.0``).

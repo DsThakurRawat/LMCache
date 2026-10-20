@@ -40,7 +40,7 @@ from lmcache.v1.distributed.l2_adapters.config import (
 from lmcache.v1.distributed.l2_adapters.factory import (
     register_l2_adapter_factory,
 )
-from lmcache.v1.key_attributes import key_attribute_suffix
+from lmcache.v1.key_attributes import matching_attributes_suffix
 from lmcache.v1.platform import create_event_notifier
 from lmcache.v1.storage_backend.connector.hfbucket_connector import (
     HFBucketClient,
@@ -94,7 +94,9 @@ def _object_key_to_string(key: ObjectKey) -> str:
         f"{key.model_name}@{key.kv_rank:08x}"
         f"@{key.object_group_id:x}@{key.chunk_hash.hex()}"
     )
-    return base + key_attribute_suffix(key.cache_salt, key.identity, key.named_identity)
+    return base + matching_attributes_suffix(
+        key.cache_salt, key.opaque_identity, key.identity_metadata
+    )
 
 
 def _object_key_to_bucket_path(key: ObjectKey, location: HFBucketLocation) -> str:

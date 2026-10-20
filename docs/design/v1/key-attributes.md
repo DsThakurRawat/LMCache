@@ -1,76 +1,115 @@
-# Key attributes on ObjectKey and IPC keys
+# Key attributes: generic transport, module-owned schemas
 
-Status: draft implementation for API review, motivated by
-[PR #5615](https://github.com/LMCache/LMCache/pull/5615).
+Status: draft API, motivated by [PR #5615](https://github.com/LMCache/LMCache/pull/5615).
 
-## API and matching
+## Categories and names
 
-`ObjectKey`, `IPCCacheServerKey` and `EncodedObjectKey` directly contain three
+`ObjectKey`, `IPCCacheServerKey` and `EncodedObjectKey` directly hold three
 collections of the same `KeyAttribute(name: str, value: str)` type:
 
-| Field | Participates in matching | Interpreted by other modules |
+| Field | Participates in matching | Module interpretation |
 | --- | --- | --- |
-| `identity` | yes | no requirement |
-| `metadata` | no | yes |
-| `named_identity` | yes | yes |
+| `opaque_identity` | yes | values are opaque outside the producer |
+| `metadata` | no | values may be interpreted by a consuming module |
+| `identity_metadata` | yes | values may be interpreted by a consuming module |
 
-There is no container between the key and its attributes. All three collections
-have names, including identity-only attributes. Names make composition explicit
-and prevent matching from depending on a producer's append order. Names and
-values in both matching categories participate in equality and hashing.
-The difference between the matching categories is whether modules interpret
-the values; their representation and matching rules are the same.
+All categories have names, so `named_identity` would not distinguish the third
+category. `opaque_identity` describes the first category's consumer contract;
+`identity_metadata` describes the intersection of metadata and matching identity.
+These names describe semantics, not whether a value happens to be JSON or a hash.
+For example, a versioned precision digest belongs in `opaque_identity`, while a
+codec description that a deserializer must read belongs in `identity_metadata`.
 
-Python uses immutable tuples of frozen `KeyAttribute` values. Each key sorts
-all three collections by name and rejects duplicate names within a collection.
-Names must be non-empty strings; values must be strings. Producers own typed,
-versioned schemas and canonical string encodings for structured values.
-Metadata is excluded from equality, hashing and IPC-key ordering.
+Python uses immutable tuples of frozen attributes; protobuf uses three direct
+`repeated KeyAttribute` fields. The key sorts each category by name. Names must
+be non-empty strings and must be unique across the entire key, preventing the
+same property from carrying conflicting values in two categories.
+
+Names and values in both matching categories participate in equality and hashing.
+Metadata is excluded from equality, hashing and IPC-key ordering. The category
+is also part of identity: moving a property between the two matching collections
+changes the namespace. Categories are stable schema decisions, not something
+that changes when a new consumer starts reading a value.
+
+## Module-owned structured values
+
+The key/transport layer preserves names and strings. A consuming module owns the
+class, fields, validation rules, defaults and schema version for a structured
+value. It parses once at its boundary rather than spreading string lookups and
+conversions through business code. Simple scalar attributes do not need a class.
+
+`encode_typed_attribute` and `decode_typed_attribute` are stateless helpers for
+this boundary. They do not introduce a wrapper, registry, inheritance requirement
+or domain-specific fields on ObjectKey. A module can use a dataclass or a
+`msgspec.Struct`; it decides whether unknown fields are allowed.
+
+The following is an illustrative integration-owned schema, not a new core KV
+format definition or an activation of precision isolation:
 
 ```python
-key = IPCCacheServerKey.from_token_ids(
-    "model", 1, 0, [1, 2], end=2,
-    identity=(KeyAttribute("kv.precision.v1", "bf16"),),
-    metadata=(KeyAttribute("trace.id", "request-123"),),
-    named_identity=(KeyAttribute("lmcache.codec.v1", "raw"),),
+from typing import ClassVar, Literal
+import msgspec
+from lmcache.v1.key_attributes import (
+    KeyAttribute, decode_typed_attribute, encode_typed_attribute,
 )
+
+class KVCacheEncoding(msgspec.Struct, frozen=True, forbid_unknown_fields=True):
+    ATTRIBUTE_NAME: ClassVar[str] = "lmcache.kv_encoding.v1"
+    dtype: Literal["bfloat16", "float8_e4m3fn"]
+    layout: Literal["NHD", "HND"]
+
+    def to_attribute(self) -> KeyAttribute:
+        return encode_typed_attribute(self.ATTRIBUTE_NAME, self)
+
+    @classmethod
+    def from_attribute(cls, attribute: KeyAttribute) -> "KVCacheEncoding":
+        return decode_typed_attribute(attribute, cls.ATTRIBUTE_NAME, cls)
 ```
 
-The protobuf representation is equally direct:
+The producer places `encoding.to_attribute()` in `identity_metadata`. The owning
+consumer locates that name and calls `KVCacheEncoding.from_attribute(attribute)`.
+Unrelated modules forward it without importing the schema. The same pattern
+works for `metadata`; the collection determines matching, not the Python class.
+A required attribute missing at the owner boundary is an error unless the owner
+explicitly defines a default. Unknown names/versions must not select a decoder
+or precision layout through an implicit fallback.
 
-```protobuf
-message KeyAttribute {
-  string name = 1;
-  string value = 2;
-}
-// Inside IpcCacheServerKey:
-repeated KeyAttribute identity = 11;
-repeated KeyAttribute metadata = 12;
-repeated KeyAttribute named_identity = 13;
-```
+The encoder produces compact JSON with sorted object keys and deterministic
+unordered collection ordering. Non-finite numbers are rejected, avoiding the
+NaN/infinity-to-null alias produced by some encoders. The decoder checks the
+exact expected name/version and validates against the owner's type and
+construction hooks. A closed Struct rejects unknown fields too. Producers must
+still normalize equivalent aliases, units and defaults: deterministic JSON does
+not establish semantic or cross-engine byte compatibility. Version the attribute
+name whenever the schema or interpretation changes incompatibly.
 
-ObjectKey uses the same three repeated fields. JSON and msgspec serialize the
-three collections directly on the key. Attributes propagate through worker-free
-keys, rank/group expansion, JSON projections, temporary serde keys and P2P.
-Session lock-release ownership checks both matching collections; store batching
-also includes both so incompatible layouts cannot share a serde allocation.
-Coordinator captures retain matching attributes, pins retain all fields, and
-traces retain all fields.
+## Propagation and ownership
 
-## Metadata ownership
+The three fields propagate through msgspec, gRPC/P2P, worker-free keys,
+rank/group expansion, JSON projections and temporary serde keys. Session
+lock-release ownership and store batching include both matching categories.
+Coordinator captures retain matching attributes; pins and traces retain all
+three categories. Generic storage does not interpret a module's schema and
+preserves even unknown attribute names and value encodings.
 
-Metadata is attached to the current operation and is not an authoritative object
-header. A dictionary can retain an earlier equal key's metadata; consumers must
-read current hints from the incoming key. Disk recovery does not restore
-metadata. Properties needed to decode or safely use stored bytes belong in
-`named_identity` or a separately designed payload header. Do not put secrets in
-matching attributes, which are visible in object names and diagnostics.
+Non-matching metadata does **not** inherently mean transient metadata. Matching
+and persistence are separate contracts. This implementation transports metadata
+with operations and excludes it from storage names; it does not add a durable
+object-metadata header. A module that needs object metadata after recovery must
+use an object header or backend metadata contract. It should not move a
+non-matching property into `identity_metadata` merely to obtain persistence.
+
+An equal key retained in a dictionary can carry an earlier operation's metadata.
+Operation hints must be read from the incoming key; persistent object metadata
+must be read from the object's metadata record. Do not put secrets in matching
+attributes, which are exposed in storage names and diagnostics.
 
 ## Storage representation
 
-Storage codecs share stateless functions to encode/decode matching attributes;
-there is no additional wrapper type. The existing model/rank/group/hash fields,
-escaping and sharding remain backend-specific. Their common suffix is:
+`encode_matching_attributes`, `decode_matching_attributes` and
+`matching_attributes_suffix` explicitly operate on the matching collections.
+Existing model/rank/group/hash fields, escaping and sharding remain specific to
+each backend. The common suffix is:
 
 ```text
 empty matching attributes, no salt: <existing four fields>
@@ -78,48 +117,45 @@ empty matching attributes, salt:    <existing four fields>@<salt>
 matching attributes:               <existing four fields>@<salt>@x1-<token>
 ```
 
-The salt placeholder remains even when empty, avoiding collision with a legacy
+The salt placeholder remains even when empty to avoid collision with a legacy
 salted key. The token is unpadded base64url of compact JSON
-`[identity_pairs, named_identity_pairs]`, where each pair is `[name, value]` and
-each collection is sorted by name. Metadata is excluded. Names and values are
-both preserved, so FS/S3 listings and raw-block recovery reconstruct complete
-matching attributes without a catalog or sidecar. Unknown versions, malformed
-schemas, duplicate names and noncanonical encodings are rejected.
+`[opaque_identity_pairs, identity_metadata_pairs]`; each pair is `[name, value]`
+and each collection is sorted by name. Metadata is excluded. Unknown versions,
+malformed schemas, duplicate names and noncanonical encodings are rejected.
+Both matching collections are reversible, so recovery retains module-readable
+values without a separate identity catalog.
 
-All L2 naming paths include both matching collections: native connectors,
-filesystem, raw-block, S3, HF bucket, Bigtable (including custom templates),
-SageMaker and dynamic NIXL. Delegating adapters inherit these codecs. Bigtable
-retains an empty salt placeholder when appending matching attributes. Native
-C++ preserves the opaque token during filename conversion.
-
-Long attributes increase filename length. Python/native FS reject extended
-names exceeding 255 UTF-8 bytes before I/O. Use compact, versioned digests for
-large matching descriptions; keep module-readable matching values compact.
-Metadata does not lengthen storage names.
+All independent L2 encoders include both matching collections: native
+connectors, filesystem, raw-block, S3, HF bucket, Bigtable (including custom
+templates), SageMaker and dynamic NIXL. Delegating adapters inherit the codecs.
+Python/native FS reject extended filenames exceeding 255 UTF-8 bytes before I/O.
+Use compact digests for large opaque descriptions and keep module-readable
+matching values compact; large structured metadata cannot simply be placed in
+a filename without a separate payload/header design.
 
 ## Precision integration and rollout
 
-This PR implements the attribute mechanism. It does not activate vLLM precision
-isolation. A precision producer should supply a deterministic digest of a typed,
-versioned description of the resolved byte representation. Hashing raw aliases
-alone does not establish compatibility: `auto` and explicit BF16 may resolve to
-the same bytes, while FP8 aliases can differ across CUDA and ROCm. Scale/layout
-resolution remains the producer's responsibility.
+This PR implements the attribute mechanism and typed value boundary. It does not
+activate vLLM precision isolation or define an exhaustive KV compatibility
+schema. The precision producer must describe the resolved byte representation,
+including relevant scales and layouts. Raw user aliases alone are insufficient:
+`auto` and explicit BF16 can resolve to the same bytes, while FP8 aliases can
+differ across CUDA and ROCm.
 
-Empty collections are the default and preserve legacy storage names. Upgrade
-clients, servers and P2P peers together before enabling matching attributes;
-older peers may ignore new fields. This PR does not negotiate capabilities.
-Extended keys deliberately miss legacy entries whose precision is unknown and
-never fall back to unqualified legacy names. Existing objects are not rewritten.
+Empty collections preserve legacy storage names. Upgrade clients, servers and
+P2P peers together before enabling matching attributes: older peers may ignore
+unknown fields, and capability negotiation is not added here. Extended keys
+never fall back to legacy entries whose precision is unknown. Existing objects
+are not rewritten.
 
-Existing cache_salt, request_id and request_configs APIs remain in place.
+Existing cache_salt, request_id and request_configs APIs stay in place.
 Token-addressed cache-control and CacheBlend producer APIs still address the
-empty-attribute namespace; their activation contracts must be updated with the
-precision producer if it uses those APIs. Explicit EncodedObjectKey control APIs
-already carry the three collections.
+empty-attribute namespace. Their activation contracts must be updated with the
+precision producer if it uses them; explicit EncodedObjectKey APIs already
+carry the three collections.
 
-Tests cover order-independent matching, name/value sensitivity, metadata
-independence, validation, direct msgspec/protobuf fields, key propagation,
-storage recovery, native/Python codec parity, session ownership and coordinator
-capture/pins. Mixed BF16/FP8 inference requires GPU validation when the precision
-producer is integrated.
+Tests cover typed owner schemas and invalid versions/types/fields, deterministic
+JSON, non-finite rejection, unknown-schema pass-through, global name uniqueness,
+matching and metadata independence, IPC/protobuf propagation, storage recovery,
+native/Python codec parity and session/coordinator ownership. Mixed BF16/FP8
+inference requires GPU validation with the eventual precision integration.

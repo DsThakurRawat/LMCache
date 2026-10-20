@@ -12,24 +12,24 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class ObjectKey(_message.Message):
-    __slots__ = ("chunk_hash", "model_name", "kv_rank", "object_group_id", "cache_salt", "identity", "metadata", "named_identity")
+    __slots__ = ("chunk_hash", "model_name", "kv_rank", "object_group_id", "cache_salt", "opaque_identity", "metadata", "identity_metadata")
     CHUNK_HASH_FIELD_NUMBER: _ClassVar[int]
     MODEL_NAME_FIELD_NUMBER: _ClassVar[int]
     KV_RANK_FIELD_NUMBER: _ClassVar[int]
     OBJECT_GROUP_ID_FIELD_NUMBER: _ClassVar[int]
     CACHE_SALT_FIELD_NUMBER: _ClassVar[int]
-    IDENTITY_FIELD_NUMBER: _ClassVar[int]
+    OPAQUE_IDENTITY_FIELD_NUMBER: _ClassVar[int]
     METADATA_FIELD_NUMBER: _ClassVar[int]
-    NAMED_IDENTITY_FIELD_NUMBER: _ClassVar[int]
+    IDENTITY_METADATA_FIELD_NUMBER: _ClassVar[int]
     chunk_hash: bytes
     model_name: str
     kv_rank: int
     object_group_id: int
     cache_salt: str
-    identity: _containers.RepeatedCompositeFieldContainer[_common_pb2.KeyAttribute]
+    opaque_identity: _containers.RepeatedCompositeFieldContainer[_common_pb2.KeyAttribute]
     metadata: _containers.RepeatedCompositeFieldContainer[_common_pb2.KeyAttribute]
-    named_identity: _containers.RepeatedCompositeFieldContainer[_common_pb2.KeyAttribute]
-    def __init__(self, chunk_hash: _Optional[bytes] = ..., model_name: _Optional[str] = ..., kv_rank: _Optional[int] = ..., object_group_id: _Optional[int] = ..., cache_salt: _Optional[str] = ..., identity: _Optional[_Iterable[_Union[_common_pb2.KeyAttribute, _Mapping]]] = ..., metadata: _Optional[_Iterable[_Union[_common_pb2.KeyAttribute, _Mapping]]] = ..., named_identity: _Optional[_Iterable[_Union[_common_pb2.KeyAttribute, _Mapping]]] = ...) -> None: ...
+    identity_metadata: _containers.RepeatedCompositeFieldContainer[_common_pb2.KeyAttribute]
+    def __init__(self, chunk_hash: _Optional[bytes] = ..., model_name: _Optional[str] = ..., kv_rank: _Optional[int] = ..., object_group_id: _Optional[int] = ..., cache_salt: _Optional[str] = ..., opaque_identity: _Optional[_Iterable[_Union[_common_pb2.KeyAttribute, _Mapping]]] = ..., metadata: _Optional[_Iterable[_Union[_common_pb2.KeyAttribute, _Mapping]]] = ..., identity_metadata: _Optional[_Iterable[_Union[_common_pb2.KeyAttribute, _Mapping]]] = ...) -> None: ...
 
 class TensorShape(_message.Message):
     __slots__ = ("dims",)

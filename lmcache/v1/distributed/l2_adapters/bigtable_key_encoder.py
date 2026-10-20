@@ -5,7 +5,7 @@ Bigtable key encoder for translating ObjectKeys to row keys.
 
 # First Party
 from lmcache.v1.distributed.api import ObjectKey
-from lmcache.v1.key_attributes import encode_key_attributes
+from lmcache.v1.key_attributes import encode_matching_attributes
 
 
 class BigtableL2KeyEncoder:
@@ -32,7 +32,7 @@ class BigtableL2KeyEncoder:
             The formatted row key as bytes.
         """
         template = self.template
-        token = encode_key_attributes(key.identity, key.named_identity)
+        token = encode_matching_attributes(key.opaque_identity, key.identity_metadata)
         # Strip @{salt} if salt is empty to prevent a trailing @
         if not key.cache_salt and not token and template.endswith("@{salt}"):
             template = template[:-7]

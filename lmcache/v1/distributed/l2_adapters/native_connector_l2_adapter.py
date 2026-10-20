@@ -37,7 +37,7 @@ from lmcache.v1.distributed.l2_adapters.base import (
     L2AdapterInterface,
     L2TaskId,
 )
-from lmcache.v1.key_attributes import key_attribute_suffix
+from lmcache.v1.key_attributes import matching_attributes_suffix
 from lmcache.v1.memory_management import MemoryObj, TensorMemoryObj
 from lmcache.v1.platform import create_event_notifier
 
@@ -90,7 +90,9 @@ def _object_key_to_string(key: ObjectKey) -> str:
         f"{key.model_name}{_KEY_SEP}{key.kv_rank:08x}"
         f"{_KEY_SEP}{key.object_group_id:x}{_KEY_SEP}{key.chunk_hash.hex()}"
     )
-    return base + key_attribute_suffix(key.cache_salt, key.identity, key.named_identity)
+    return base + matching_attributes_suffix(
+        key.cache_salt, key.opaque_identity, key.identity_metadata
+    )
 
 
 def _obj_to_memoryview(

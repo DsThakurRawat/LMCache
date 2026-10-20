@@ -826,7 +826,7 @@ def test_matching_extensions_split_store_batches(
     )
     base = replace(
         make_object_key(0),
-        identity=(KeyAttribute("dtype", "bf16"),),
+        opaque_identity=(KeyAttribute("dtype", "bf16"),),
         metadata=(KeyAttribute("trace", "a"),),
     )
     keys = [
@@ -834,7 +834,7 @@ def test_matching_extensions_split_store_batches(
         replace(
             base,
             chunk_hash=ObjectKey.IntHash2Bytes(1),
-            identity=(KeyAttribute("dtype", "fp8"),),
+            opaque_identity=(KeyAttribute("dtype", "fp8"),),
         ),
         replace(
             base,
@@ -849,7 +849,7 @@ def test_matching_extensions_split_store_batches(
         assert wait_for_condition(lambda: adapter.debug_get_stored_object_count() == 3)
         assert sorted(len(batch) for batch in batches) == [1, 2]
         assert all(
-            len({(key.identity, key.named_identity) for key in batch}) == 1
+            len({(key.opaque_identity, key.identity_metadata) for key in batch}) == 1
             for batch in batches
         )
     finally:

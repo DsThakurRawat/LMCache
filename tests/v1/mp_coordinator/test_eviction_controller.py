@@ -389,9 +389,9 @@ async def test_execute_evictions_dispatches_to_registered_instance():
                 "kv_rank": 0,
                 "object_group_id": 0,
                 "cache_salt": "alice",
-                "identity": [],
+                "opaque_identity": [],
                 "metadata": [],
-                "named_identity": [],
+                "identity_metadata": [],
             }
         ]
     }
@@ -1009,11 +1009,11 @@ def test_pin_capture_restore_keeps_matching_extensions() -> None:
     source, _, _ = _setup()
     key = replace(
         _make_key("tenant"),
-        identity=(KeyAttribute("dtype", "bf16"),),
-        named_identity=(KeyAttribute("codec", "raw-v1"),),
+        opaque_identity=(KeyAttribute("dtype", "bf16"),),
+        identity_metadata=(KeyAttribute("codec", "raw-v1"),),
     )
     source.pin([key])
     restored, _, _ = _setup()
     restored.restore(source.capture())
-    incompatible = replace(key, identity=(KeyAttribute("dtype", "fp8"),))
+    incompatible = replace(key, opaque_identity=(KeyAttribute("dtype", "fp8"),))
     assert restored.filter_unpinned([key, incompatible]) == [incompatible]

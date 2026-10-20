@@ -24,9 +24,9 @@ message IpcCacheServerKey {
   string cache_salt = 8;
   optional bytes encoded_request_configs = 9;
   int64 num_kv_readers = 10;
-  repeated KeyAttribute identity = 11;
+  repeated KeyAttribute opaque_identity = 11;
   repeated KeyAttribute metadata = 12;
-  repeated KeyAttribute named_identity = 13;
+  repeated KeyAttribute identity_metadata = 13;
 }
 
 // Store / Retrieve and CacheBlend retrieve share this reply shape.

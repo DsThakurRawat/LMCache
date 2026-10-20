@@ -67,9 +67,9 @@ def _group_keys_by_shape(
         list[ObjectKey],
     ] = defaultdict(list)
     for key in keys:
-        groups[(key.model_name, key.kv_rank, key.identity, key.named_identity)].append(
-            key
-        )
+        groups[
+            (key.model_name, key.kv_rank, key.opaque_identity, key.identity_metadata)
+        ].append(key)
     return groups
 
 
