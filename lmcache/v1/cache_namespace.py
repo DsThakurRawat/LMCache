@@ -6,14 +6,13 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import NoReturn
 import base64
-import binascii
 
 # Third Party
 import msgspec
 
 
 class _FrozenTags(dict[str, str]):
-    """A dict snapshot that remains serializable by msgspec."""
+    """An immutable dict snapshot that msgspec can serialize."""
 
     def _immutable(self, *args: object, **kwargs: object) -> NoReturn:
         raise TypeError("cache namespace tags are immutable")
@@ -71,13 +70,11 @@ class CacheNamespace:
             return cls()
         if not token.startswith("x1-"):
             raise ValueError("unsupported cache namespace version")
-        try:
-            payload = base64.b64decode(
-                token[3:] + "=" * (-len(token[3:]) % 4), altchars=b"-_", validate=True
-            )
-            result = msgspec.json.decode(payload, type=cls)
-        except (binascii.Error, msgspec.DecodeError) as exc:
-            raise ValueError("invalid cache namespace token") from exc
+        encoded = token[3:]
+        payload = base64.b64decode(
+            encoded + "=" * (-len(encoded) % 4), altchars=b"-_", validate=True
+        )
+        result = msgspec.json.decode(payload, type=cls)
         if result.to_token() != token:
             raise ValueError("non-canonical cache namespace token")
         return result

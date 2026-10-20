@@ -62,11 +62,15 @@ def test_namespace_transport_and_object_expansion() -> None:
         None,
         [1, 2],
         end=2,
-        namespace=CacheNamespace(KVCacheEncoding("bfloat16", "NHD"), {"tenant": "a"}),
+        namespace=CacheNamespace(
+            KVCacheEncoding("bfloat16", "NHD"), {"tenant": "a", "app": "v1"}
+        ),
     )
     for codec in (msgspec.msgpack, msgspec.json):
         decoded = codec.decode(codec.encode(ipc), type=IPCCacheServerKey)
         assert decoded == ipc and hash(decoded) == hash(ipc)
+        assert list(decoded.namespace.tags) == ["app", "tenant"]
+        assert decoded.namespace.to_token() == ipc.namespace.to_token()
         groups = ipc_key_to_object_keys(decoded, [b"1234", b"5678"], [0, 1])
         assert len(groups) == 2 and all(len(group) == 4 for group in groups)
         for key in (key for group in groups for key in group):
@@ -84,7 +88,9 @@ def test_namespace_transport_and_object_expansion() -> None:
 
 
 def test_namespace_protobuf_roundtrip() -> None:
-    namespace = CacheNamespace(KVCacheEncoding("bfloat16", "NHD"), {"tenant": "a"})
+    namespace = CacheNamespace(
+        KVCacheEncoding("bfloat16", "NHD"), {"tenant": "a", "app": "v1"}
+    )
     ipc = IPCCacheServerKey.from_token_ids("model", 1, 0, [1], namespace=namespace)
     key = ObjectKey(b"1234", "model", 0, namespace=namespace)
     for message_type, value in (
@@ -97,6 +103,8 @@ def test_namespace_protobuf_roundtrip() -> None:
         assert message.namespace.kv_encoding.dtype == "bfloat16"
         (recovered,) = decode(message_type.FromString(message.SerializeToString()))
         assert recovered == value and hash(recovered) == hash(value)
+        assert list(recovered.namespace.tags) == ["app", "tenant"]
+        assert recovered.namespace.to_token() == namespace.to_token()
     _, decode = compile_request_codec_for_types(p2p_service_pb2.ObjectKey, (ObjectKey,))
     (legacy,) = decode(
         p2p_service_pb2.ObjectKey(chunk_hash=b"1234", model_name="model")
