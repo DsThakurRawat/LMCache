@@ -25,6 +25,7 @@ import zmq
 # First Party
 from lmcache import torch_dev, torch_device_type
 from lmcache.utils import EngineType
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.config import (
     EvictionConfig,
     L1ManagerConfig,
@@ -206,7 +207,7 @@ def test_native_alias_sparse_checkpoint_roundtrip(native_client: RequestClient) 
     instance_id = os.getpid()
     tokens = tuple(range(4 * CHUNK + 1))
     key = IPCCacheServerKey(
-        model_name="native-alias-roundtrip",
+        namespace=CacheNamespace(model_name="native-alias-roundtrip"),
         world_size=1,
         worker_id=0,
         token_ids=tokens,
@@ -311,7 +312,7 @@ def test_state_ordinals_alias_the_page_allocation(native_client: RequestClient) 
     ]
     instance_id = os.getpid()
     key = IPCCacheServerKey(
-        model_name="native-shared-page-pool",
+        namespace=CacheNamespace(model_name="native-shared-page-pool"),
         world_size=1,
         worker_id=0,
         token_ids=tuple(range(2 * CHUNK)),

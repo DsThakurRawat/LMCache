@@ -12,20 +12,16 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class ObjectKey(_message.Message):
-    __slots__ = ("chunk_hash", "model_name", "kv_rank", "object_group_id", "cache_salt", "namespace")
+    __slots__ = ("chunk_hash", "namespace", "kv_rank", "object_group_id")
     CHUNK_HASH_FIELD_NUMBER: _ClassVar[int]
-    MODEL_NAME_FIELD_NUMBER: _ClassVar[int]
+    NAMESPACE_FIELD_NUMBER: _ClassVar[int]
     KV_RANK_FIELD_NUMBER: _ClassVar[int]
     OBJECT_GROUP_ID_FIELD_NUMBER: _ClassVar[int]
-    CACHE_SALT_FIELD_NUMBER: _ClassVar[int]
-    NAMESPACE_FIELD_NUMBER: _ClassVar[int]
     chunk_hash: bytes
-    model_name: str
+    namespace: _common_pb2.CacheNamespace
     kv_rank: int
     object_group_id: int
-    cache_salt: str
-    namespace: _common_pb2.CacheNamespace
-    def __init__(self, chunk_hash: _Optional[bytes] = ..., model_name: _Optional[str] = ..., kv_rank: _Optional[int] = ..., object_group_id: _Optional[int] = ..., cache_salt: _Optional[str] = ..., namespace: _Optional[_Union[_common_pb2.CacheNamespace, _Mapping]] = ...) -> None: ...
+    def __init__(self, chunk_hash: _Optional[bytes] = ..., namespace: _Optional[_Union[_common_pb2.CacheNamespace, _Mapping]] = ..., kv_rank: _Optional[int] = ..., object_group_id: _Optional[int] = ...) -> None: ...
 
 class TensorShape(_message.Message):
     __slots__ = ("dims",)

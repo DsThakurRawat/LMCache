@@ -10,6 +10,7 @@ import time
 import torch
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.check import check_mode
 from lmcache.v1.check.utils import (
     DEFAULT_KV_DTYPE_STR,
@@ -37,7 +38,7 @@ def _create_object_key(model: str, key_id: str) -> ObjectKey:
     """Create a test ObjectKey."""
     return ObjectKey(
         chunk_hash=ObjectKey.IntHash2Bytes(hash(key_id) & 0xFFFFFFFF),
-        model_name=model,
+        namespace=CacheNamespace(model_name=model),
         kv_rank=0,
     )
 

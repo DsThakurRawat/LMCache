@@ -11,6 +11,7 @@ import pytest
 import torch
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.config import (
     DevDaxL1ManagerConfig,
@@ -92,7 +93,14 @@ def test_dram_devdax_serving_round_trip(tmp_path: Path) -> None:
         )
     )
     storage = StorageManager(config)
-    keys = [ObjectKey(ObjectKey.IntHash2Bytes(i), "multi-serving", 0) for i in range(3)]
+    keys = [
+        ObjectKey(
+            chunk_hash=ObjectKey.IntHash2Bytes(i),
+            namespace=CacheNamespace(model_name="multi-serving"),
+            kv_rank=0,
+        )
+        for i in range(3)
+    ]
     try:
         owners = []
         for index, key in enumerate(keys):
@@ -158,7 +166,14 @@ def test_fixed_affinity_loads_into_nondefault_l1(tmp_path: Path) -> None:
         ]
     )
     storage = StorageManager(config)
-    keys = [ObjectKey(ObjectKey.IntHash2Bytes(i), "affinity", 0) for i in range(3)]
+    keys = [
+        ObjectKey(
+            chunk_hash=ObjectKey.IntHash2Bytes(i),
+            namespace=CacheNamespace(model_name="affinity"),
+            kv_rank=0,
+        )
+        for i in range(3)
+    ]
     try:
         for key in keys:
             objects = storage.reserve_write([key], LAYOUT)

@@ -19,6 +19,7 @@ import pytest
 
 # First Party
 from lmcache.lmcache_native import Bitmap
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import (
     DEFAULT_ATTN_WINDOW_DESC,
     AttnWindowDesc,
@@ -143,11 +144,22 @@ class TestDeleteObjectsEndpoint:
                 "keys": [
                     {
                         "chunk_hash_hex": _hex(1),
-                        "model_name": "llama",
                         "kv_rank": 0,
-                        "cache_salt": "alice",
+                        "namespace": {
+                            "model_name": "llama",
+                            "cache_salt": "alice",
+                            "tags": {},
+                        },
                     },
-                    {"chunk_hash_hex": _hex(2), "model_name": "llama", "kv_rank": 0},
+                    {
+                        "chunk_hash_hex": _hex(2),
+                        "kv_rank": 0,
+                        "namespace": {
+                            "model_name": "llama",
+                            "cache_salt": "",
+                            "tags": {},
+                        },
+                    },
                 ],
             },
         )
@@ -160,9 +172,8 @@ class TestDeleteObjectsEndpoint:
         forwarded = primary.delete_calls[0]
         assert forwarded[0] == ObjectKey(
             chunk_hash=b"\x00\x00\x00\x01",
-            model_name="llama",
+            namespace=CacheNamespace(model_name="llama", cache_salt="alice"),
             kv_rank=0,
-            cache_salt="alice",
         )
         assert forwarded[1].cache_salt == ""
 
@@ -177,7 +188,17 @@ class TestDeleteObjectsEndpoint:
             "/cache/objects",
             json={
                 "adapter": "fs",
-                "keys": [{"chunk_hash_hex": _hex(1), "model_name": "m", "kv_rank": 0}],
+                "keys": [
+                    {
+                        "chunk_hash_hex": _hex(1),
+                        "kv_rank": 0,
+                        "namespace": {
+                            "model_name": "m",
+                            "cache_salt": "",
+                            "tags": {},
+                        },
+                    }
+                ],
             },
         )
         assert resp.status_code == 200, resp.text
@@ -212,7 +233,17 @@ class TestDeleteObjectsEndpoint:
             "/cache/objects",
             json={
                 "tier": "l1",
-                "keys": [{"chunk_hash_hex": _hex(1), "model_name": "m", "kv_rank": 0}],
+                "keys": [
+                    {
+                        "chunk_hash_hex": _hex(1),
+                        "kv_rank": 0,
+                        "namespace": {
+                            "model_name": "m",
+                            "cache_salt": "",
+                            "tags": {},
+                        },
+                    }
+                ],
             },
         )
         assert resp.status_code == 200, resp.text
@@ -231,7 +262,17 @@ class TestDeleteObjectsEndpoint:
             json={
                 "tier": "all",
                 "force": True,
-                "keys": [{"chunk_hash_hex": _hex(1), "model_name": "m", "kv_rank": 0}],
+                "keys": [
+                    {
+                        "chunk_hash_hex": _hex(1),
+                        "kv_rank": 0,
+                        "namespace": {
+                            "model_name": "m",
+                            "cache_salt": "",
+                            "tags": {},
+                        },
+                    }
+                ],
             },
         )
         assert resp.status_code == 200, resp.text
@@ -249,7 +290,17 @@ class TestDeleteObjectsEndpoint:
             "/cache/objects",
             json={
                 "tier": "l1",
-                "keys": [{"chunk_hash_hex": _hex(1), "model_name": "m", "kv_rank": 0}],
+                "keys": [
+                    {
+                        "chunk_hash_hex": _hex(1),
+                        "kv_rank": 0,
+                        "namespace": {
+                            "model_name": "m",
+                            "cache_salt": "",
+                            "tags": {},
+                        },
+                    }
+                ],
             },
         )
         assert resp.status_code == 200, resp.text
@@ -276,7 +327,19 @@ class TestDeleteObjectsEndpoint:
             {},
             {"keys": "not-a-list"},
             {"keys": [{"chunk_hash_hex": _hex(1), "kv_rank": 0}]},
-            {"keys": [{"chunk_hash_hex": _hex(1), "model_name": "m", "kv_rank": "x"}]},
+            {
+                "keys": [
+                    {
+                        "chunk_hash_hex": _hex(1),
+                        "kv_rank": "x",
+                        "namespace": {
+                            "model_name": "m",
+                            "cache_salt": "",
+                            "tags": {},
+                        },
+                    }
+                ]
+            },
         ],
     )
     def test_422_on_validation_failure(self, body):
@@ -295,28 +358,54 @@ class TestDeleteObjectsEndpoint:
         assert adapter.delete_calls == []
 
     @pytest.mark.parametrize(
-        "body",
+        "body,status_code",
         [
-            {"keys": [{"chunk_hash_hex": "zz", "model_name": "m", "kv_rank": 0}]},
-            {
-                "keys": [
-                    {"chunk_hash_hex": _hex(1), "model_name": "bad@name", "kv_rank": 0}
-                ]
-            },
+            (
+                {
+                    "keys": [
+                        {
+                            "chunk_hash_hex": "zz",
+                            "kv_rank": 0,
+                            "namespace": {"model_name": "m"},
+                        }
+                    ]
+                },
+                400,
+            ),
+            (
+                {
+                    "keys": [
+                        {
+                            "chunk_hash_hex": _hex(1),
+                            "kv_rank": 0,
+                            "namespace": {"model_name": "bad@name"},
+                        }
+                    ]
+                },
+                422,
+            ),
         ],
     )
-    def test_400_on_object_key_invariant_violation(self, body):
+    def test_rejects_invalid_key(self, body, status_code: int):
         adapter = _FakeAdapter()
         client = TestClient(_make_app(_sm_with(("s3", adapter))))
         resp = client.request("DELETE", "/cache/objects", json=body)
-        assert resp.status_code == 400, resp.text
+        assert resp.status_code == status_code, resp.text
         assert adapter.delete_calls == []
 
     def test_400_when_batch_exceeds_cap(self):
         adapter = _FakeAdapter()
         client = TestClient(_make_app(_sm_with(("s3", adapter))))
         oversized = [
-            {"chunk_hash_hex": _hex(i), "model_name": "m", "kv_rank": 0}
+            {
+                "chunk_hash_hex": _hex(i),
+                "kv_rank": 0,
+                "namespace": {
+                    "model_name": "m",
+                    "cache_salt": "",
+                    "tags": {},
+                },
+            }
             for i in range(MAX_DELETE_BATCH + 1)
         ]
         resp = client.request("DELETE", "/cache/objects", json={"keys": oversized})
@@ -334,9 +423,8 @@ class TestListObjectsEndpoint:
     def test_happy_path_defaults_to_primary(self):
         k1 = ObjectKey(
             chunk_hash=b"\xde\xad\xbe\xef",
-            model_name="llama",
+            namespace=CacheNamespace(model_name="llama", cache_salt="alice"),
             kv_rank=2,
-            cache_salt="alice",
         )
         primary = _FakeAdapter(
             list_page=KeyListPage(
@@ -358,10 +446,13 @@ class TestListObjectsEndpoint:
             {
                 "key": {
                     "chunk_hash_hex": "deadbeef",
-                    "model_name": "llama",
                     "kv_rank": 2,
                     "object_group_id": 0,
-                    "cache_salt": "alice",
+                    "namespace": {
+                        "model_name": "llama",
+                        "cache_salt": "alice",
+                        "tags": {},
+                    },
                 },
                 "size_bytes": 4096,
             }

@@ -2,90 +2,89 @@
 
 Status: draft, motivated by [PR #5615](https://github.com/LMCache/LMCache/pull/5615).
 
-## Model
+## Model and ownership
 
-`ObjectKey.namespace` is a `CacheNamespace` shared with `IPCCacheServerKey` and
-`EncodedObjectKey`. Every namespace field participates in equality, hashing and
-persistent storage identity:
+`CacheNamespace` owns the identity shared by requests and stored objects:
 
 ```python
 namespace = CacheNamespace(
-    kv_encoding=KVCacheEncoding(dtype="bfloat16", layout="NHD"),
+    model_name="org/model",
+    cache_salt="tenant-a",
     tags={"adapter_revision": "abc123"},
 )
+key = ObjectKey(chunk_hash=b"1234", namespace=namespace, kv_rank=0)
 ```
 
-`kv_encoding` has explicit typed fields for consumers that need to interpret the
-KV representation. Producers supply resolved dtype and layout names; the model
-does not infer compatibility from user aliases. `None` means unspecified, not a
-guessed representation. Add future interpreted properties as typed fields rather
-than serialized classes inside string attributes.
+`model_name` selects the model, `cache_salt` isolates users, and `tags` adds
+opaque string-valued identity dimensions. All three participate in equality,
+hashing and ordering. Tags are copied, sorted by name and frozen at construction,
+so insertion order and later changes to the input dictionary cannot change key
+identity. Msgspec serializes the immutable dict snapshot without custom hooks.
 
-`tags` is a string-to-string map for additional opaque identity dimensions.
-Construction copies and freezes the supplied map. Callers read it as a
-`Mapping[str, str]`; insertion order does not affect identity or storage names.
-The dict-backed immutable snapshot allows msgspec to serialize it without custom
-transport hooks. Names must be non-empty and values must be strings.
+`ObjectKey`, `EncodedObjectKey` and `IPCCacheServerKey` store the namespace once.
+Their read-only `model_name` and `cache_salt` properties forward to it. The outer
+object key retains `chunk_hash`, `kv_rank` and `object_group_id`: those identify
+the concrete chunk, shard and group within the cache namespace. IPC keys retain
+token ranges, parallelism and request context instead; expansion carries the
+same namespace into each object key.
 
-Non-matching information belongs to its owner, outside `ObjectKey`: request
-configuration and session tracking remain on the request, while durable object
-metadata belongs in an object header or descriptor. This PR does not introduce
-an object-metadata persistence contract.
+Model-name and salt validation live in `CacheNamespace`. Model names exclude
+`@`; salts exclude `@`, `/`, `\` and NUL and are limited to 128 characters.
+These constraints preserve existing backend key formats.
 
-## Request and object keys
+Non-matching information belongs to its request or object descriptor, outside
+ObjectKey. This PR does not introduce a durable metadata header or a speculative
+KV encoding schema. Add interpreted identity properties as explicit typed fields
+when their producer/consumer and compatibility rules are established.
 
-`IPCCacheServerKey` describes a token range and request context. The server hashes
-chunks and expands ranks and object groups into individual `ObjectKey` values.
-The conversion carries the complete namespace. Session release checks and store
-batch grouping also include it.
+## Protocol and propagation
 
-Msgspec uses the same Python value objects. Protobuf defines `CacheNamespace`
-with an optional `KVCacheEncoding` message and `map<string, string> tags`. Both
-engine/server and P2P key messages carry the namespace. Traces, coordinator
-captures and pins, encoded keys and temporary serde keys preserve it too.
+Msgspec and protobuf encode the namespace as a nested value with `model_name`,
+`cache_salt` and a string-map `tags`. Removed outer protobuf fields are reserved.
+Clients, servers, P2P peers and control-plane consumers must upgrade together;
+the new request/key wire shape requires `namespace` rather than flat identity
+fields. Read-only Python access properties do not preserve old constructor or
+wire formats. Namespace validation also occurs during HTTP request parsing
+(`422` for invalid nested identity fields); invalid chunk hex is still rejected
+by key conversion (`400`).
 
-## Storage API
+Session release checks and store batching use the complete namespace. Traces,
+coordinator captures/pins, encoded keys and temporary serde keys preserve it.
+Existing positional coordinator captures and flattened trace/pin records remain
+readable; new JSON key projections contain the nested namespace.
 
-Backends call `ObjectKey.to_storage_key()`, `to_filename()` or
-`format_storage_key()` rather than selecting namespace fields themselves.
-`from_storage_key()` and `from_filename()` restore the namespace. The formatter
-retains existing backend templates, model escaping and rank formatting; it adds
-the namespace token even when a custom Bigtable template omits that field.
+## Storage API and compatibility
+
+Adapters call `ObjectKey.to_storage_key()`, `to_filename()` or
+`format_storage_key()`. Decoding and dynamic NIXL sharding also use key methods;
+adapters do not select namespace fields for storage identity.
 
 ```text
-empty namespace, no salt: <existing four fields>
-empty namespace, salt:    <existing four fields>@<salt>
-nonempty namespace:       <existing four fields>@<salt>@x1-<token>
+no tags, no salt: <model>@<rank>@<group>@<hash>
+no tags, salt:    <model>@<rank>@<group>@<hash>@<salt>
+tags:            <model>@<rank>@<group>@<hash>@<salt>@x1-<token>
 ```
 
-The token is unpadded base64url of the namespace's compact JSON, with tags sorted
-by name. It is reversible so storage recovery retains typed properties. Decoding
-rejects unsupported versions and noncanonical payloads. The salt placeholder is
-present even when empty, preventing collision with a legacy salted key.
+Model and salt retain their original prefix positions. The token is unpadded
+base64url of the compact JSON tag map, sorted by name. Decoding uses the prefix
+and token to reconstruct one complete namespace. The empty salt placeholder
+prevents collision with legacy salted keys. Unknown versions, malformed tag maps
+and noncanonical tokens are rejected.
 
-FS, native connectors, S3, Bigtable, HF bucket, SageMaker, raw-block and dynamic
-NIXL retain their existing names for empty namespaces. Native `keys.h` accepts
-and preserves the extra opaque token; it does not interpret namespace fields.
-Python/native FS reject extended filenames exceeding 255 UTF-8 bytes. Keep
-identity values compact; large descriptions should use producer-computed digest
-tags, while interpreted object metadata needs a separate storage contract.
+Untagged names remain unchanged across FS, native connectors, S3, Bigtable,
+HF bucket, SageMaker, raw-block and dynamic NIXL. Native `keys.h` only preserves
+the opaque token. Python/native FS reject extended names exceeding 255 UTF-8
+bytes. Existing untagged objects are not rewritten. Tagged formats in this draft
+are not a released storage compatibility contract.
 
-## Scope and rollout
+## Scope and validation
 
-This PR provides the identity model and end-to-end propagation, including L2. It
-does not activate a vLLM precision producer or define exhaustive cross-engine KV
-compatibility. Integration must describe resolved bytes, including relevant
-scales/layouts, and normalize equivalent aliases before constructing namespaces.
+This PR provides the identity model and propagation, including L2. It does not
+activate an engine precision producer or establish cross-engine KV compatibility.
+Token-addressed cache-control and CacheBlend producer APIs continue to use the
+untagged namespace until their integration explicitly supplies tags.
 
-Empty namespaces preserve legacy names. Upgrade clients, servers and P2P peers
-together before enabling nonempty namespaces: older peers can ignore unknown
-fields. This PR adds neither capability negotiation nor fallback to legacy
-objects of unknown representation. Existing objects are not rewritten.
-
-Token-addressed cache-control and CacheBlend producer APIs still address the
-empty namespace. Explicit `EncodedObjectKey` APIs carry namespaces; enabling the
-precision producer must update its other entry points as needed.
-
-Tests cover immutable/order-independent tags, matching, protocol propagation,
-session ownership, coordinator recovery, L2 round trips and native/Python codec
-parity. Mixed-precision inference requires validation with the eventual producer.
+Tests cover sorted immutable tags, model/salt isolation, protocol round trips,
+session ownership, coordinator/trace recovery and Python/native storage parity.
+Existing tests and fixtures migrate to the nested identity model; no hardware
+inference claim is made by these CPU checks.

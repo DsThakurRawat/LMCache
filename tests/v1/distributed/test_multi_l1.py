@@ -13,6 +13,7 @@ import torch
 
 # First Party
 from lmcache.cli.commands.trace._dispatch import ReplayContext, build_default_dispatcher
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.config import (
     EvictionConfig,
@@ -42,7 +43,11 @@ StorageFactory = Callable[
 
 def key(index: int) -> ObjectKey:
     """Return a deterministic test key."""
-    return ObjectKey(ObjectKey.IntHash2Bytes(index), "overflow-test", 0)
+    return ObjectKey(
+        chunk_hash=ObjectKey.IntHash2Bytes(index),
+        namespace=CacheNamespace(model_name="overflow-test"),
+        kv_rank=0,
+    )
 
 
 @pytest.fixture

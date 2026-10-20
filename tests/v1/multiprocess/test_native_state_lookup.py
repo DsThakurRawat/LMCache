@@ -18,6 +18,7 @@ import torch
 
 # First Party
 from lmcache.lmcache_native import Bitmap, EngineKVFormat
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import (
     MemoryLayoutDesc,
     ObjectKey,
@@ -160,7 +161,7 @@ def _groups() -> KVLayerGroupsManager:
 
 def _key(world_size: int = 1, tokens: tuple[int, ...] = TOKENS) -> IPCCacheServerKey:
     return IPCCacheServerKey(
-        model_name="native-state",
+        namespace=CacheNamespace(model_name="native-state"),
         world_size=world_size,
         worker_id=None,
         token_ids=tokens,

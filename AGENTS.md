@@ -218,3 +218,9 @@ requirements and torch. This builds `lmcache_native` and `lmcache_fs`; it does
 not provide GPU device operations. Regenerate protobuf bindings with
 `python lmcache/v1/multiprocess/transport/grpc_impl/_proto_gen/_generate.py`
 after editing schemas.
+
+On macOS, Linux-specific tests that call `os.eventfd_read` or inspect
+`/proc/self/fd` (including cache-salt L2 eviction and devdax allocator suites)
+need Linux validation. Service integration suites such as Bigtable also need
+the root `bigtable_emulator` fixture; `--confcutdir=tests/v1` intentionally omits
+it. Keep these exclusions separate from passing CPU key/transport checks.

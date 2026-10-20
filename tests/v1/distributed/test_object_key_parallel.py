@@ -23,6 +23,7 @@ import torch
 
 # First Party
 from lmcache import torch_dev
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import (
     MemoryLayoutDesc,
     ObjectKey,
@@ -113,7 +114,7 @@ def create_object_key(
     )
     return ObjectKey(
         chunk_hash=ObjectKey.IntHash2Bytes(chunk_hash),
-        model_name=model_name,
+        namespace=CacheNamespace(model_name=model_name),
         kv_rank=kv_rank,
     )
 

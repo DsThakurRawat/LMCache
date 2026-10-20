@@ -219,7 +219,7 @@ class TestOtherApis:
         zero = _json(_render("quota-config", {"default_limit_gb": 0.0}))
         assert zero["metrics"]["default_limit_gb"] == 0.0
 
-    def test_keys_truncates_the_chunk_hash(self) -> None:
+    def test_keys_render_namespace_and_truncate_hash(self) -> None:
         # 64 hex chars per row would push the placements column off-screen.
         body = {
             "total": 1,
@@ -227,9 +227,12 @@ class TestOtherApis:
                 {
                     "key": {
                         "chunk_hash_hex": "ab" * 32,
-                        "model_name": "m",
                         "kv_rank": 0,
-                        "cache_salt": "",
+                        "namespace": {
+                            "model_name": "m",
+                            "cache_salt": "tenant-a",
+                            "tags": {},
+                        },
                     },
                     "placements": [
                         {"instance_id": "mp-1", "tier": "l1", "backend": "dram"}
@@ -240,7 +243,8 @@ class TestOtherApis:
         row = _json(_render("keys", body))["metrics"]["keys"][0]
         assert row["chunk"] == "ab" * 6
         assert row["placements"] == "mp-1:l1/dram"
-        assert row["cache_salt"] == "(default)"
+        assert row["cache_salt"] == "tenant-a"
+        assert row["model"] == "m"
 
     def test_directory_stats_nests_the_blend_index(self) -> None:
         body = {

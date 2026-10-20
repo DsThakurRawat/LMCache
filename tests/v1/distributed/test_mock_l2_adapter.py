@@ -15,6 +15,7 @@ import pytest
 import torch
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.internal_api import L2AdapterListener
 from lmcache.v1.distributed.l2_adapters.mock_l2_adapter import (
@@ -58,7 +59,7 @@ def create_object_key(chunk_id: int, model_name: str = "test_model") -> ObjectKe
     """Create a test ObjectKey with the given chunk ID."""
     return ObjectKey(
         chunk_hash=ObjectKey.IntHash2Bytes(chunk_id),
-        model_name=model_name,
+        namespace=CacheNamespace(model_name=model_name),
         kv_rank=0,
     )
 
@@ -748,17 +749,15 @@ class TestEvictionInterface:
         alice_keys = [
             ObjectKey(
                 chunk_hash=ObjectKey.IntHash2Bytes(i),
-                model_name="m",
+                namespace=CacheNamespace(model_name="m", cache_salt="alice"),
                 kv_rank=0,
-                cache_salt="alice",
             )
             for i in (1, 2)
         ]
         bob_key = ObjectKey(
             chunk_hash=ObjectKey.IntHash2Bytes(3),
-            model_name="m",
+            namespace=CacheNamespace(model_name="m", cache_salt="bob"),
             kv_rank=0,
-            cache_salt="bob",
         )
         obj = create_memory_obj(size=128)  # 128 floats * 4 bytes = 512 B
         for k in alice_keys + [bob_key]:

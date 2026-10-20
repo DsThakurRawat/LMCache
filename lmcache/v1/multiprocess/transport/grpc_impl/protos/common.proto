@@ -6,29 +6,27 @@ syntax = "proto3";
 
 package lmcache.mp;
 
-message KVCacheEncoding {
-  string dtype = 1;
-  string layout = 2;
-}
-
 message CacheNamespace {
-  optional KVCacheEncoding kv_encoding = 1;
+  string model_name = 3;
+  string cache_salt = 4;
+  reserved 1;
+  reserved "kv_encoding";
   map<string, string> tags = 2;
 }
 
 // Cache key used by engine and CacheBlend RPCs.
 message IpcCacheServerKey {
-  string model_name = 1;
+  reserved 1, 8;
+  reserved "model_name", "cache_salt";
+  CacheNamespace namespace = 11;
   int64 world_size = 2;
   optional int64 worker_id = 3;
   repeated int64 token_ids = 4;
   int64 start = 5;
   int64 end = 6;
   string request_id = 7;
-  string cache_salt = 8;
   optional bytes encoded_request_configs = 9;
   int64 num_kv_readers = 10;
-  CacheNamespace namespace = 11;
 }
 
 // Store / Retrieve and CacheBlend retrieve share this reply shape.

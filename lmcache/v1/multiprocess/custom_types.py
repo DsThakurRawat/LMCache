@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Standard
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Callable
 
 # Third Party
@@ -39,7 +39,7 @@ class IPCCacheServerKey:
     request_ids are considered equal for cache purposes).
     """
 
-    model_name: str
+    namespace: CacheNamespace
     world_size: int
     worker_id: int | None
 
@@ -50,17 +50,6 @@ class IPCCacheServerKey:
     # === Session tracking (not part of cache identity) ===
     request_id: str = field(compare=False)
 
-    # === Per-user isolation salt (part of cache identity) ===
-    # msgspec encodes dataclasses as maps, so forward wire compatibility
-    # works by field name: an old payload without ``cache_salt`` decodes
-    # on new code using the default "". Placing the field last is a style
-    # choice — all defaulted fields must come after non-defaulted ones.
-    #
-    # Invariant: must not contain ``@``, ``/``, ``\``, or NUL, and
-    # must be <= 128 chars — same rationale as ObjectKey (see
-    # ObjectKey.cache_salt). Validated in __post_init__.
-    cache_salt: str = ""
-
     # Request-scoped LMCache configuration passed across the IPC boundary.
     # It is metadata, not part of cache identity.
     request_configs: dict[str, Any] | None = field(default=None, compare=False)
@@ -70,24 +59,15 @@ class IPCCacheServerKey:
     # lookups reject it.
     num_kv_readers: int = field(default=0, compare=False)
 
-    namespace: CacheNamespace = field(default_factory=CacheNamespace)
+    @property
+    def model_name(self) -> str:
+        """Model identity, owned by the namespace."""
+        return self.namespace.model_name
 
-    # Duplicated from ObjectKey — cannot import ObjectKey here due to
-    # circular dependency (api.py imports IPCCacheServerKey).
-    _SALT_FORBIDDEN_CHARS = frozenset("@/\\\x00")
-    _SALT_MAX_LEN = 128
-
-    def __post_init__(self) -> None:
-        bad = self._SALT_FORBIDDEN_CHARS & set(self.cache_salt)
-        if bad:
-            raise ValueError(
-                f"cache_salt must not contain {bad!r} (got {self.cache_salt!r})"
-            )
-        if len(self.cache_salt) > self._SALT_MAX_LEN:
-            raise ValueError(
-                f"cache_salt exceeds max length {self._SALT_MAX_LEN} "
-                f"(got {len(self.cache_salt)})"
-            )
+    @property
+    def cache_salt(self) -> str:
+        """Isolation salt, owned by the namespace."""
+        return self.namespace.cache_salt
 
     # Helper function for unit tests only
     @classmethod
@@ -107,7 +87,6 @@ class IPCCacheServerKey:
     ) -> "IPCCacheServerKey":
         """Create a key from token ids. Only used by the tests."""
         return cls(
-            model_name=model_name,
             world_size=world_size,
             worker_id=worker_id,
             num_kv_readers=num_kv_readers,
@@ -115,9 +94,12 @@ class IPCCacheServerKey:
             start=start,
             end=end,
             request_id=request_id,
-            cache_salt=cache_salt,
             request_configs=request_configs,
-            namespace=namespace if namespace is not None else CacheNamespace(),
+            namespace=(
+                CacheNamespace(model_name=model_name, cache_salt=cache_salt)
+                if namespace is None
+                else replace(namespace, model_name=model_name, cache_salt=cache_salt)
+            ),
         )
 
     def require_num_kv_readers(self) -> int:
@@ -140,17 +122,15 @@ class IPCCacheServerKey:
     def no_worker_id_version(self) -> "IPCCacheServerKey":
         """Create a copy with worker_id=None for lookup requests."""
         return IPCCacheServerKey(
-            model_name=self.model_name,
+            namespace=self.namespace,
             world_size=self.world_size,
             worker_id=None,
-            num_kv_readers=self.num_kv_readers,
             token_ids=self.token_ids,
             start=self.start,
             end=self.end,
             request_id=self.request_id,
-            cache_salt=self.cache_salt,
             request_configs=self.request_configs,
-            namespace=self.namespace,
+            num_kv_readers=self.num_kv_readers,
         )
 
 

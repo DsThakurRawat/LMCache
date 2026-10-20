@@ -22,6 +22,7 @@ import torch
 
 # First Party
 from lmcache import torch_dev, torch_device_type
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import (
     FULL_ATTENTION_WINDOW_CHUNKS,
     FetchingPolicy,
@@ -81,7 +82,7 @@ def make_object_key(chunk_id: int, gid: int = 0, kv_rank: int = 0) -> ObjectKey:
     """Create a test ObjectKey for one chunk of one object group and rank."""
     return ObjectKey(
         chunk_hash=ObjectKey.IntHash2Bytes(chunk_id),
-        model_name="test_model",
+        namespace=CacheNamespace(model_name="test_model"),
         kv_rank=kv_rank,
         object_group_id=gid,
     )

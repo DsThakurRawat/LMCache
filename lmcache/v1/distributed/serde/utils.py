@@ -48,9 +48,7 @@ def make_temp_key(original_key: ObjectKey) -> ObjectKey:
     """
     return ObjectKey(
         chunk_hash=original_key.chunk_hash + os.urandom(16),
-        model_name=original_key.model_name,
+        namespace=original_key.namespace,
         kv_rank=original_key.kv_rank,
         object_group_id=original_key.object_group_id,
-        cache_salt=original_key.cache_salt,
-        namespace=original_key.namespace,
     )

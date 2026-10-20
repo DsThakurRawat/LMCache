@@ -28,6 +28,7 @@ from lmcache.cli.commands.trace._dispatch import (
     build_default_dispatcher,
 )
 from lmcache.cli.commands.trace._driver import StorageReplayDriver
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import (
     MemoryLayoutDesc,
     ObjectKey,
@@ -80,7 +81,7 @@ def _make_sm_config() -> StorageManagerConfig:
 def _make_key(i: int) -> ObjectKey:
     return ObjectKey(
         chunk_hash=i.to_bytes(4, "big"),
-        model_name="test",
+        namespace=CacheNamespace(model_name="test"),
         kv_rank=0,
     )
 

@@ -33,6 +33,7 @@ from lmcache.utils import (
     _lmcache_nvtx_annotate,
     init_logger,
 )
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.gpu_connector.utils import LayoutHints
 from lmcache.v1.multiprocess.custom_types import (
     KV_EVENT_KIND_REMOVED,
@@ -1349,16 +1350,15 @@ class LMCacheMPSchedulerAdapter:
         # NOTE: for the scheduler adapter, we don't have a worker id,
         # so we set it to None in the key.
         return IPCCacheServerKey(
-            num_kv_readers=self.parallel_strategy.num_kv_readers,
-            model_name=self.model_name,
+            namespace=CacheNamespace(model_name=self.model_name, cache_salt=cache_salt),
             world_size=self.world_size,
             worker_id=None,
             token_ids=tuple(token_ids),
             start=start,
             end=end,
             request_id=request_id,
-            cache_salt=cache_salt,
             request_configs=request_configs,
+            num_kv_readers=self.parallel_strategy.num_kv_readers,
         )
 
     def update_pending_store_count(self, req_id: str, count: int) -> bool:
@@ -2765,14 +2765,13 @@ class LMCacheMPWorkerAdapter:
             IPCCacheServerKey: The constructed key.
         """
         return IPCCacheServerKey(
-            num_kv_readers=self.parallel_strategy.num_kv_readers,
-            model_name=self.model_name,
+            namespace=CacheNamespace(model_name=self.model_name, cache_salt=cache_salt),
             world_size=self.world_size,
             worker_id=self.worker_id,
             token_ids=tuple(token_ids),
             start=start,
             end=end,
             request_id=request_id,
-            cache_salt=cache_salt,
             request_configs=request_configs,
+            num_kv_readers=self.parallel_strategy.num_kv_readers,
         )

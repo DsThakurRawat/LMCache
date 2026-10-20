@@ -789,14 +789,17 @@ Each ``EncodedObjectKey`` is
 
     {
       "chunk_hash_hex": "abc123...",
-      "model_name": "meta-llama/Llama-3-8B",
+      "namespace": {
+        "model_name": "meta-llama/Llama-3-8B",
+        "cache_salt": "user-a",
+        "tags": {}
+      },
       "kv_rank": 0,
-      "object_group_id": 0,
-      "cache_salt": "user-a"
+      "object_group_id": 0
     }
 
-``object_group_id`` (default ``0``) and ``cache_salt`` (default ``""``)
-are optional for backward compatibility with older wire payloads.
+``namespace.model_name`` is required. ``object_group_id`` defaults to ``0``;
+``namespace.cache_salt`` and ``namespace.tags`` default to ``""`` and ``{}``.
 
 **Response** (``200 OK``):
 
@@ -816,9 +819,9 @@ with ``ok=false`` and an ``error`` field carrying the reason.
 **HTTP status codes:**
 
 - ``200``: request processed (check ``ok`` for the L2 adapter outcome).
-- ``400``: batch exceeds the limit, or a key payload violates an
-  ``ObjectKey`` invariant (bad hex, ``@`` in ``model_name``, forbidden
-  ``cache_salt`` character).
+- ``400``: batch exceeds the limit, or the chunk hash is not valid hex.
+- ``422``: request validation fails, including an invalid model name or salt
+  in the nested namespace.
 - ``404``: ``adapter`` (body) does not match any configured adapter.
 - ``422``: Pydantic-level body-shape failure (missing ``keys``,
   wrong field types).
@@ -887,10 +890,13 @@ cause keys to appear, disappear, or shift between pages.
         {
           "key": {
             "chunk_hash_hex": "abc123",
-            "model_name": "meta-llama/Llama-3-8B",
             "kv_rank": 0,
             "object_group_id": 0,
-            "cache_salt": "user-a"
+            "namespace": {
+              "model_name": "meta-llama/Llama-3-8B",
+              "cache_salt": "user-a",
+              "tags": {}
+            }
           },
           "size_bytes": 4194304
         }

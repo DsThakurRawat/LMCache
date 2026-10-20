@@ -14,6 +14,7 @@ import threading
 import pytest
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.internal_api import L2AdapterListener, L2StoreResult
 from lmcache.v1.distributed.l2_adapters.base import (
@@ -26,9 +27,8 @@ from lmcache.v1.distributed.l2_adapters.base import (
 def _make_key(chunk_id: int, salt: str = "") -> ObjectKey:
     return ObjectKey(
         chunk_hash=ObjectKey.IntHash2Bytes(chunk_id),
-        model_name="m",
+        namespace=CacheNamespace(model_name="m", cache_salt=salt),
         kv_rank=0,
-        cache_salt=salt,
     )
 
 

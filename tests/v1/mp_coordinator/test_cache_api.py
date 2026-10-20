@@ -233,10 +233,13 @@ def test_list_pins_shows_pinned_keys_with_counts():
             {
                 "key": {
                     "chunk_hash_hex": k.chunk_hash.hex(),
-                    "model_name": "m",
                     "kv_rank": k.kv_rank,
                     "object_group_id": 0,
-                    "cache_salt": "alice",
+                    "namespace": {
+                        "model_name": "m",
+                        "cache_salt": "alice",
+                        "tags": {},
+                    },
                 },
                 "pin_count": 2,
             }
@@ -262,7 +265,7 @@ def test_list_pins_filters_by_cache_salt_and_model():
 
         body = client.get("/cache/pins", params={"cache_salt": "bob"}).json()
         assert body["total"] == len(bob)
-        assert {p["key"]["cache_salt"] for p in body["pins"]} == {"bob"}
+        assert {p["key"]["namespace"]["cache_salt"] for p in body["pins"]} == {"bob"}
 
         body = client.get("/cache/pins", params={"model_name": "m"}).json()
         assert body["total"] == len(alice) + len(bob)

@@ -13,6 +13,7 @@ These tests verify the basic functionality of the LRUEvictionPolicy:
 # Third Party
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import ObjectKey
 from lmcache.v1.distributed.eviction_policy import LRUEvictionPolicy
 from lmcache.v1.distributed.internal_api import (
@@ -27,7 +28,11 @@ from lmcache.v1.distributed.internal_api import (
 def make_key(chunk_hash: int, model: str = "model", kv_rank: int = 0) -> ObjectKey:
     """Create an ObjectKey for testing."""
     hash_bytes = ObjectKey.IntHash2Bytes(chunk_hash)
-    return ObjectKey(chunk_hash=hash_bytes, model_name=model, kv_rank=kv_rank)
+    return ObjectKey(
+        chunk_hash=hash_bytes,
+        namespace=CacheNamespace(model_name=model),
+        kv_rank=kv_rank,
+    )
 
 
 # =============================================================================

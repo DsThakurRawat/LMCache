@@ -23,6 +23,7 @@ import threading
 import pytest
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import ObjectKey
 from lmcache.v1.multiprocess.custom_types import IPCCacheServerKey
 from lmcache.v1.multiprocess.modules.lookup import resolve_prefetched_obj_keys
@@ -60,7 +61,7 @@ class _FakeRequest:
 def _make_key(n_chunks: int, start_chunks: int = 0) -> IPCCacheServerKey:
     n_tokens = n_chunks * CHUNK_SIZE
     return IPCCacheServerKey(
-        model_name="m",
+        namespace=CacheNamespace(model_name="m"),
         world_size=1,
         worker_id=None,
         token_ids=tuple(range(n_tokens)),
@@ -102,7 +103,13 @@ def test_touch_cached_keys_hits_both_tiers():
     sm._l1_managers_by_id = {0: l1}
     sm._l2_adapters = {0: l2_a, 1: l2_b}
 
-    keys = [ObjectKey(chunk_hash=ObjectKey.IntHash2Bytes(7), model_name="m", kv_rank=0)]
+    keys = [
+        ObjectKey(
+            chunk_hash=ObjectKey.IntHash2Bytes(7),
+            namespace=CacheNamespace(model_name="m"),
+            kv_rank=0,
+        )
+    ]
     StorageManager.touch_cached_keys(sm, keys)
 
     l1.touch_keys.assert_called_once_with(keys)
@@ -383,7 +390,13 @@ def test_serde_wrapper_forwards_touch_to_the_inner_adapter():
     wrapper = SerdeL2AdapterWrapper.__new__(SerdeL2AdapterWrapper)
     inner = MagicMock()
     wrapper._inner = inner
-    keys = [ObjectKey(chunk_hash=ObjectKey.IntHash2Bytes(3), model_name="m", kv_rank=0)]
+    keys = [
+        ObjectKey(
+            chunk_hash=ObjectKey.IntHash2Bytes(3),
+            namespace=CacheNamespace(model_name="m"),
+            kv_rank=0,
+        )
+    ]
 
     SerdeL2AdapterWrapper.submit_touch(wrapper, keys)
 

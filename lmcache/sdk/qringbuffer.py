@@ -704,7 +704,9 @@ class QRingBufferAdapter:
             request_id=request_id,
             cache_salt=cache_salt,
         )
-        key = replace(key, model_name=self.q_model_name)
+        key = replace(
+            key, namespace=replace(key.namespace, model_name=self.q_model_name)
+        )
         future = self._adapter.transfer_ctx.submit_q_store(
             request_id,
             key,

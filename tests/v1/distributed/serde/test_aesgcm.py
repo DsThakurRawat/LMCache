@@ -17,6 +17,7 @@ import pytest
 import torch
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.serde import (
     SerdeConfig,
@@ -56,7 +57,9 @@ class _ByteBuf:
 
 def _key(cache_salt: str = "alice") -> ObjectKey:
     return ObjectKey(
-        chunk_hash=b"\x11" * 32, model_name="m", kv_rank=0, cache_salt=cache_salt
+        chunk_hash=b"\x11" * 32,
+        namespace=CacheNamespace(model_name="m", cache_salt=cache_salt),
+        kv_rank=0,
     )
 
 

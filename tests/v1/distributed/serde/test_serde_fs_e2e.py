@@ -20,6 +20,7 @@ import torch
 
 # First Party
 from lmcache import torch_dev, torch_device_type
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import (
     MemoryLayoutDesc,
     ObjectKey,
@@ -54,7 +55,7 @@ def _make_key(chunk_hash: bytes) -> ObjectKey:
     """Create an ObjectKey with the given raw hash bytes."""
     return ObjectKey(
         chunk_hash=chunk_hash,
-        model_name="test-model",
+        namespace=CacheNamespace(model_name="test-model"),
         kv_rank=0,
     )
 

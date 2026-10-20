@@ -22,6 +22,7 @@ import torch
 
 # First Party
 from lmcache import device_ops  # noqa: F401
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.mp_coordinator.blend_client import PENDING  # noqa: F401
 from lmcache.v1.mp_coordinator.blend_client import BlendCoordinatorClient
 from lmcache.v1.multiprocess import server as server_mod
@@ -193,14 +194,13 @@ def test_submit_coordinator_match_sends_this_server_s_namespace():
     coordinator = MagicMock()
     eng._coordinator = coordinator
     key = IPCCacheServerKey(
-        model_name="llama",
+        namespace=CacheNamespace(model_name="llama", cache_salt="tenant-a"),
         world_size=4,
         worker_id=None,
         token_ids=tuple(range(8)),
         start=0,
         end=8,
         request_id="rid",
-        cache_salt="tenant-a",
     )
 
     assert eng._submit_coordinator_match(key) is True
@@ -219,7 +219,7 @@ def test_submit_coordinator_match_skips_a_query_shorter_than_a_chunk():
     coordinator = MagicMock()
     eng._coordinator = coordinator
     key = IPCCacheServerKey(
-        model_name="llama",
+        namespace=CacheNamespace(model_name="llama"),
         world_size=1,
         worker_id=None,
         token_ids=(1, 2),
@@ -622,14 +622,14 @@ def _store_hook_key(num_chunks: int, chunk_size: int = 4):
 
     n = num_chunks * chunk_size
     return IPCCacheServerKey(
-        model_name="m",
+        namespace=CacheNamespace(model_name="m"),
         world_size=1,
-        num_kv_readers=1,
         worker_id=0,
         token_ids=tuple(range(1000, 1000 + n)),
         start=0,
         end=n,
         request_id="req-store-mask",
+        num_kv_readers=1,
     )
 
 

@@ -2,6 +2,7 @@
 """Unit tests for ``lmcache.v1.distributed.serde.utils``."""
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import ObjectKey
 from lmcache.v1.distributed.serde.utils import make_temp_key
 
@@ -9,10 +10,9 @@ from lmcache.v1.distributed.serde.utils import make_temp_key
 def _orig(salt: str = "", object_group_id: int = 0) -> ObjectKey:
     return ObjectKey(
         chunk_hash=b"\x00" * 16,
-        model_name="model",
+        namespace=CacheNamespace(model_name="model", cache_salt=salt),
         kv_rank=0,
         object_group_id=object_group_id,
-        cache_salt=salt,
     )
 
 

@@ -50,12 +50,14 @@ def decode_key(encoded: object) -> ObjectKey:
     if len(values) not in (5, 6):
         raise ValueError("invalid coordinator key encoding: expected 5 or 6 fields")
     chunk_hash, model_name, kv_rank, object_group_id, cache_salt = values[:5]
-    namespace = CacheNamespace.from_token(values[5] if len(values) == 6 else "")
+    namespace = CacheNamespace.from_token(
+        values[5] if len(values) == 6 else "",
+        model_name=model_name,
+        cache_salt=cache_salt,
+    )
     return ObjectKey(
         chunk_hash=chunk_hash,
-        model_name=model_name,
+        namespace=namespace,
         kv_rank=kv_rank,
         object_group_id=object_group_id,
-        cache_salt=cache_salt,
-        namespace=namespace,
     )

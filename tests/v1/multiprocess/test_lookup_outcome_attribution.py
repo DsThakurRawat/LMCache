@@ -16,6 +16,7 @@ import pytest
 
 # First Party
 from lmcache.lmcache_native import Bitmap
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import AttnWindowDesc, PrefetchHandle, PrefetchResult
 from lmcache.v1.mp_observability.event import EventType
 from lmcache.v1.multiprocess.custom_types import IPCCacheServerKey
@@ -27,14 +28,13 @@ CHUNK_SIZE = 256
 def _lookup_key(world_size: int) -> IPCCacheServerKey:
     """A lookup-side IPC key (worker_id None -> expand over all workers)."""
     return IPCCacheServerKey(
-        model_name="m",
+        namespace=CacheNamespace(model_name="m", cache_salt="salt"),
         world_size=world_size,
         worker_id=None,
         token_ids=(0,),
         start=0,
         end=0,
         request_id="req-1",
-        cache_salt="salt",
         num_kv_readers=1,
     )
 

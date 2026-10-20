@@ -13,16 +13,19 @@ from dataclasses import asdict
 import pytest
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import EncodedObjectKey, ObjectKey
 
 
 def _make_object_key(**overrides) -> ObjectKey:
     return ObjectKey(
         chunk_hash=bytes.fromhex(overrides.get("chunk_hash_hex", "deadbeef")),
-        model_name=overrides.get("model_name", "llama"),
+        namespace=CacheNamespace(
+            model_name=overrides.get("model_name", "llama"),
+            cache_salt=overrides.get("cache_salt", ""),
+        ),
         kv_rank=overrides.get("kv_rank", 7),
         object_group_id=overrides.get("object_group_id", 0),
-        cache_salt=overrides.get("cache_salt", ""),
     )
 
 
@@ -55,13 +58,19 @@ class TestRoundTrip:
     def test_uppercase_hex_round_trips_lowercased(self):
         # bytes.fromhex accepts uppercase; the recovered ObjectKey
         # then re-projects to lowercase via bytes.hex().
-        ck = EncodedObjectKey(chunk_hash_hex="DEADBEEF", model_name="m", kv_rank=0)
+        ck = EncodedObjectKey(
+            chunk_hash_hex="DEADBEEF",
+            namespace=CacheNamespace(model_name="m"),
+            kv_rank=0,
+        )
         obj = ck.to_object_key()
         assert obj.chunk_hash == b"\xde\xad\xbe\xef"
         assert obj.to_encoded_object_key().chunk_hash_hex == "deadbeef"
 
     def test_optional_fields_default(self):
-        ck = EncodedObjectKey(chunk_hash_hex="aa", model_name="m", kv_rank=0)
+        ck = EncodedObjectKey(
+            chunk_hash_hex="aa", namespace=CacheNamespace(model_name="m"), kv_rank=0
+        )
         assert ck.object_group_id == 0
         assert ck.cache_salt == ""
 
@@ -70,35 +79,39 @@ class TestRoundTrip:
         # set is the public contract.
         ck = EncodedObjectKey(
             chunk_hash_hex="aa",
-            model_name="m",
+            namespace=CacheNamespace(model_name="m", cache_salt="x"),
             kv_rank=0,
             object_group_id=1,
-            cache_salt="x",
         )
         assert asdict(ck) == {
             "chunk_hash_hex": "aa",
-            "model_name": "m",
             "kv_rank": 0,
             "object_group_id": 1,
-            "cache_salt": "x",
-            "namespace": {"kv_encoding": None, "tags": {}},
+            "namespace": {
+                "model_name": "m",
+                "cache_salt": "x",
+                "tags": {},
+            },
         }
 
 
 class TestToObjectKeyValidation:
     def test_rejects_non_hex_chunk_hash(self):
-        ck = EncodedObjectKey(chunk_hash_hex="not-hex", model_name="m", kv_rank=0)
+        ck = EncodedObjectKey(
+            chunk_hash_hex="not-hex",
+            namespace=CacheNamespace(model_name="m"),
+            kv_rank=0,
+        )
         with pytest.raises(ValueError):
             ck.to_object_key()
 
-    def test_propagates_object_key_invariants(self):
-        # ``@`` in model_name is rejected by ObjectKey.__post_init__,
-        # which fires from inside ``to_object_key``. This is the
-        # contract the HTTP endpoint relies on for malformed-but-typed
-        # bodies (which Pydantic let through).
-        ck = EncodedObjectKey(chunk_hash_hex="aa", model_name="bad@name", kv_rank=0)
-        with pytest.raises(ValueError):
-            ck.to_object_key()
+    def test_namespace_rejects_invalid_model(self):
+        with pytest.raises(ValueError, match="model_name"):
+            EncodedObjectKey(
+                chunk_hash_hex="aa",
+                namespace=CacheNamespace(model_name="bad@name"),
+                kv_rank=0,
+            )
 
 
 class TestSchemasReExport:

@@ -19,6 +19,7 @@ import pytest
 import torch
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.transfer_channel.api import TransferChannelAddress
 from lmcache.v1.multiprocess.config import MPServerConfig
@@ -570,14 +571,13 @@ def test_generated_grpc_services_communicate_end_to_end(
 ) -> None:
     client, calls = grpc_client
     key = IPCCacheServerKey(
-        model_name="model",
+        namespace=CacheNamespace(model_name="model", cache_salt="tenant"),
         world_size=2,
         worker_id=None,
         token_ids=(1, 2, 3),
         start=0,
         end=3,
         request_id="request",
-        cache_salt="tenant",
         request_configs={"blend": True},
         num_kv_readers=2,
     )
@@ -630,7 +630,13 @@ def test_generated_grpc_services_communicate_end_to_end(
     )
 
     task_id = client.p2p_lookup_and_lock(
-        [ObjectKey(b"chunk", "model", 0, cache_salt="tenant")],
+        [
+            ObjectKey(
+                chunk_hash=b"chunk",
+                namespace=CacheNamespace(model_name="model", cache_salt="tenant"),
+                kv_rank=0,
+            )
+        ],
         {0: MemoryLayoutDesc([torch.Size([2, 4])], [torch.float16])},
     ).result(5)
     assert task_id == 41

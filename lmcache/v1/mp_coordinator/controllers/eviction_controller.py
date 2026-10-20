@@ -501,13 +501,16 @@ def _decode_pin(entry: Mapping[str, object]) -> tuple[ObjectKey, int]:
         The key and its pin count.
     """
     fields = cast("Mapping[str, object]", entry["key"])
+    namespace = {
+        "model_name": fields.get("model_name", ""),
+        "cache_salt": fields.get("cache_salt", ""),
+        **cast("Mapping[str, object]", fields.get("namespace", {})),
+    }
     encoded = EncodedObjectKey(
         chunk_hash_hex=str(fields["chunk_hash_hex"]),
-        model_name=str(fields["model_name"]),
+        namespace=msgspec.convert(namespace, type=CacheNamespace),
         kv_rank=cast(int, fields["kv_rank"]),
         object_group_id=cast(int, fields["object_group_id"]),
-        cache_salt=str(fields["cache_salt"]),
-        namespace=msgspec.convert(fields.get("namespace", {}), type=CacheNamespace),
     )
     return encoded.to_object_key(), cast(int, entry["count"])
 

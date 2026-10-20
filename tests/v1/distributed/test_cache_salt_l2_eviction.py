@@ -21,6 +21,7 @@ import pytest
 import torch
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import ObjectKey
 from lmcache.v1.distributed.config import EvictionConfig
 from lmcache.v1.distributed.eviction import L2EvictionPolicy
@@ -50,9 +51,8 @@ from lmcache.v1.memory_management import (
 def _key(chunk_id: int, cache_salt: str) -> ObjectKey:
     return ObjectKey(
         chunk_hash=ObjectKey.IntHash2Bytes(chunk_id),
-        model_name="test_model",
+        namespace=CacheNamespace(model_name="test_model", cache_salt=cache_salt),
         kv_rank=0,
-        cache_salt=cache_salt,
     )
 
 

@@ -50,14 +50,14 @@ STORE_LOOP_POLL_TIMEOUT_MS = 500
 
 def _group_keys_by_shape(
     keys: list[ObjectKey],
-) -> dict[tuple[str, int, CacheNamespace], list[ObjectKey]]:
-    """Group by model, rank and namespace so each batch has one representation."""
+) -> dict[tuple[int, CacheNamespace], list[ObjectKey]]:
+    """Group by rank and namespace so each batch has one representation."""
     groups: dict[
-        tuple[str, int, CacheNamespace],
+        tuple[int, CacheNamespace],
         list[ObjectKey],
     ] = defaultdict(list)
     for key in keys:
-        groups[(key.model_name, key.kv_rank, key.namespace)].append(key)
+        groups[(key.kv_rank, key.namespace)].append(key)
     return groups
 
 

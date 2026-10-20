@@ -23,6 +23,7 @@ import pytest
 import torch
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.l2_adapters.config import (
     parse_args_to_l2_adapters_config,
@@ -70,15 +71,13 @@ def _make_key(tag: int) -> ObjectKey:
         # New API: (chunk_hash: bytes, model_name, kv_rank)
         return ObjectKey(
             chunk_hash=tag.to_bytes(8, "big"),
-            model_name="test",
+            namespace=CacheNamespace(model_name="test"),
             kv_rank=0,
         )
     # Old API: (model_name, world_size, worker_id, chunk_hash)
     return ObjectKey(  # type: ignore[call-arg]
-        model_name="test",
-        world_size=1,
-        worker_id=0,
         chunk_hash=tag,  # type: ignore[arg-type]
+        namespace=CacheNamespace(model_name="test"),
     )
 
 

@@ -16,6 +16,7 @@ import pytest
 import torch
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.internal_api import L2AdapterListener
 from lmcache.v1.distributed.l2_adapters import create_l2_adapter
@@ -186,7 +187,7 @@ def create_test_config() -> BigtableL2AdapterConfig:
 def create_test_key(chunk_id: int) -> ObjectKey:
     return ObjectKey(
         chunk_hash=chunk_id.to_bytes(4, byteorder="big"),
-        model_name="test-model",
+        namespace=CacheNamespace(model_name="test-model"),
         kv_rank=0,
         object_group_id=0,
     )
@@ -432,10 +433,9 @@ class TestBigtableL2Adapter:
         )
         key = ObjectKey(
             chunk_hash=b"\x01\x02\x03\x04\x05\x06\x07\x08",
-            model_name="my-model",
+            namespace=CacheNamespace(model_name="my-model", cache_salt="user-salt"),
             kv_rank=15,
             object_group_id=3,
-            cache_salt="user-salt",
         )
         row_key = encoder.encode_row_key(key)
         assert row_key == b"0102@my-model@0000000f@3@0102030405060708@user-salt"
@@ -443,7 +443,7 @@ class TestBigtableL2Adapter:
         # Test with empty salt
         key_no_salt = ObjectKey(
             chunk_hash=b"\x01\x02\x03\x04\x05\x06\x07\x08",
-            model_name="my-model",
+            namespace=CacheNamespace(model_name="my-model"),
             kv_rank=15,
             object_group_id=3,
         )
@@ -460,10 +460,9 @@ class TestBigtableL2Adapter:
 
         key_layerwise = LayerwiseObjectKey(
             chunk_hash=b"\x01\x02\x03\x04\x05\x06\x07\x08",
-            model_name="my-model",
+            namespace=CacheNamespace(model_name="my-model", cache_salt="user-salt"),
             kv_rank=15,
             object_group_id=3,
-            cache_salt="user-salt",
             layer_id=5,
         )
         row_key_layerwise = encoder.encode_row_key(key_layerwise)

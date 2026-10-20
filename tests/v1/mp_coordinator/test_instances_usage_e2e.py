@@ -20,6 +20,7 @@ import requests
 import uvicorn
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import ObjectKey, Tier
 from lmcache.v1.mp_coordinator.api import (
     CacheEventBatch,
@@ -143,9 +144,8 @@ def _publish(
     """Publish one cache-event batch to ``POST /events``."""
     key = ObjectKey(
         chunk_hash=bytes([index]) * 32,
-        model_name="model",
+        namespace=CacheNamespace(model_name="model", cache_salt="tenant"),
         kv_rank=0,
-        cache_salt="tenant",
     )
     entry = (
         CacheEventEntry(key=key.to_encoded_object_key(), size_bytes=size_bytes)

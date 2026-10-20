@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import GroupedObjectKeys, ObjectKey, PrefetchLockMode
 from lmcache.v1.multiprocess.warm_prefetch import (
     COMPLETED,
@@ -24,7 +25,7 @@ from lmcache.v1.multiprocess.warm_prefetch import (
 def _key(i: int) -> ObjectKey:
     return ObjectKey(
         chunk_hash=ObjectKey.IntHash2Bytes(i),
-        model_name="test_model",
+        namespace=CacheNamespace(model_name="test_model"),
         kv_rank=0,
     )
 

@@ -16,6 +16,7 @@ from unittest.mock import MagicMock
 import pytest
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import ObjectKey, ipc_key_to_object_keys
 from lmcache.v1.distributed.eviction import L1EvictionPolicy
 from lmcache.v1.distributed.eviction_policy import LRUEvictionPolicy
@@ -31,7 +32,11 @@ from lmcache.v1.multiprocess.token_hasher import TokenHasher
 def make_key(chunk_hash: int, model: str = "model", kv_rank: int = 0) -> ObjectKey:
     """Create an ObjectKey for testing."""
     hash_bytes = ObjectKey.IntHash2Bytes(chunk_hash)
-    return ObjectKey(chunk_hash=hash_bytes, model_name=model, kv_rank=kv_rank)
+    return ObjectKey(
+        chunk_hash=hash_bytes,
+        namespace=CacheNamespace(model_name=model),
+        kv_rank=kv_rank,
+    )
 
 
 def make_ipc_key(

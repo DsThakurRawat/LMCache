@@ -31,12 +31,14 @@ import uuid
 
 # Third Party
 import httpx
+import msgspec
 import torch
 import uvicorn
 import zmq
 
 # First Party
 from lmcache.utils import EngineType
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import EncodedObjectKey, ObjectKey, Tier
 from lmcache.v1.mp_coordinator.api import CacheEventBatch
 from lmcache.v1.mp_coordinator.app import create_app
@@ -229,7 +231,7 @@ def directory(coordinator_url: str) -> set[Placement]:
         response.raise_for_status()
         page = response.json()
         for row in page["keys"]:
-            key = EncodedObjectKey(**row["key"]).to_object_key()
+            key = msgspec.convert(row["key"], type=EncodedObjectKey).to_object_key()
             for placement in row["placements"]:
                 held.add(
                     Placement(
@@ -596,14 +598,13 @@ class KVClient:
             )
         request_id = uuid.uuid4().hex
         key = IPCCacheServerKey(
-            model_name=self.model_name,
+            namespace=CacheNamespace(model_name=self.model_name, cache_salt=cache_salt),
             world_size=1,
             worker_id=0,
             token_ids=tuple(token_ids),
             start=0,
             end=chunks * CHUNK_SIZE,
             request_id=request_id,
-            cache_salt=cache_salt,
             num_kv_readers=1,
         )
         event = self._transfer.create_recorded_event()

@@ -12,6 +12,7 @@ appended as a trailing field when non-empty. Unsalted keys use the
 import pytest
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import ObjectKey
 from lmcache.v1.distributed.l2_adapters.fs_l2_adapter import (
     _filename_to_object_key,
@@ -36,10 +37,9 @@ class TestFilenameRoundtrip:
     def test_roundtrip(self, model_name: str, cache_salt: str, object_group_id: int):
         key = ObjectKey(
             chunk_hash=b"\xde\xad\xbe\xef",
-            model_name=model_name,
+            namespace=CacheNamespace(model_name=model_name, cache_salt=cache_salt),
             kv_rank=42,
             object_group_id=object_group_id,
-            cache_salt=cache_salt,
         )
         fn = _object_key_to_filename(key)
         assert fn.endswith(".data")
@@ -54,7 +54,7 @@ class TestFilenameRoundtrip:
         fn0 = _object_key_to_filename(
             ObjectKey(
                 chunk_hash=b"\xde\xad\xbe\xef",
-                model_name="llama",
+                namespace=CacheNamespace(model_name="llama"),
                 kv_rank=42,
                 object_group_id=0,
             )
@@ -62,7 +62,7 @@ class TestFilenameRoundtrip:
         fn1 = _object_key_to_filename(
             ObjectKey(
                 chunk_hash=b"\xde\xad\xbe\xef",
-                model_name="llama",
+                namespace=CacheNamespace(model_name="llama"),
                 kv_rank=42,
                 object_group_id=1,
             )
@@ -75,10 +75,9 @@ class TestFilenameRoundtrip:
         parsed = _filename_to_object_key(fn)
         assert parsed == ObjectKey(
             chunk_hash=b"\xde\xad\xbe\xef",
-            model_name="llama",
+            namespace=CacheNamespace(model_name="llama", cache_salt=""),
             kv_rank=42,
             object_group_id=0,
-            cache_salt="",
         )
 
     def test_salted_format(self):
@@ -87,10 +86,9 @@ class TestFilenameRoundtrip:
         parsed = _filename_to_object_key(fn)
         assert parsed == ObjectKey(
             chunk_hash=b"\xde\xad\xbe\xef",
-            model_name="llama",
+            namespace=CacheNamespace(model_name="llama", cache_salt="alice"),
             kv_rank=42,
             object_group_id=2,
-            cache_salt="alice",
         )
 
     def test_non_data_file_returns_none(self):
@@ -231,7 +229,7 @@ class TestObjectKeyValidation:
         with pytest.raises(ValueError, match="object_group_id"):
             ObjectKey(
                 chunk_hash=b"\xde\xad\xbe\xef",
-                model_name="llama",
+                namespace=CacheNamespace(model_name="llama"),
                 kv_rank=0,
                 object_group_id=-1,
             )
@@ -281,17 +279,16 @@ class TestIPCCacheServerKeyCacheSalt:
         assert k2.worker_id is None
         assert k2.cache_salt == "alice"
 
-    def test_wire_compat_old_payload_decodes(self):
-        """An old 7-field msgspec payload must decode cleanly on new code
-        with cache_salt defaulting to ""."""
+    def test_wire_namespace_defaults_salt(self):
+        """An omitted namespace salt defaults to the unisolated namespace."""
         # Third Party
         import msgspec
 
         # First Party
         from lmcache.v1.multiprocess.custom_types import IPCCacheServerKey
 
-        old_payload = {
-            "model_name": "m",
+        payload = {
+            "namespace": {"model_name": "m"},
             "world_size": 1,
             "worker_id": 0,
             "token_ids": (1, 2),
@@ -299,7 +296,7 @@ class TestIPCCacheServerKeyCacheSalt:
             "end": 2,
             "request_id": "r1",
         }
-        wire = msgspec.msgpack.encode(old_payload)
+        wire = msgspec.msgpack.encode(payload)
         decoded = msgspec.msgpack.decode(wire, type=IPCCacheServerKey)
         assert decoded.cache_salt == ""
 

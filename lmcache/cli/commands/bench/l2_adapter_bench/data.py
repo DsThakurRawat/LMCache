@@ -11,6 +11,7 @@ import select
 import torch
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import ObjectKey
 from lmcache.v1.distributed.internal_api import L1MemoryDesc
 from lmcache.v1.memory_management import (
@@ -89,7 +90,7 @@ def make_object_keys(
         keys.append(
             ObjectKey(
                 chunk_hash=chunk_hash,
-                model_name=model_name,
+                namespace=CacheNamespace(model_name=model_name),
                 kv_rank=idx,
             )
         )

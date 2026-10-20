@@ -5,6 +5,7 @@
 import asyncio
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import ObjectKey, Tier
 from lmcache.v1.mp_coordinator.api import (
     CacheEventBatch,
@@ -41,7 +42,9 @@ def _source() -> tuple[HttpCacheEventSource, _RecordingConsumer]:
 
 
 def _batch() -> CacheEventBatch:
-    key = ObjectKey(chunk_hash=b"hash", model_name="model", kv_rank=0)
+    key = ObjectKey(
+        chunk_hash=b"hash", namespace=CacheNamespace(model_name="model"), kv_rank=0
+    )
     return CacheEventBatch(
         instance_id="node-a",
         incarnation=1,

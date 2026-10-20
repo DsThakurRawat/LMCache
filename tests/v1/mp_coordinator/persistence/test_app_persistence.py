@@ -47,8 +47,12 @@ def _store_one_key(client: TestClient) -> None:
                         {
                             "key": {
                                 "chunk_hash_hex": "aa",
-                                "model_name": "m",
                                 "kv_rank": 0,
+                                "namespace": {
+                                    "model_name": "m",
+                                    "cache_salt": "",
+                                    "tags": {},
+                                },
                             },
                             "size_bytes": 1024,
                         }

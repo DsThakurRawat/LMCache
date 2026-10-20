@@ -155,22 +155,23 @@ def decode_args(args: dict[str, Any]) -> dict[str, Any]:
 def _enc_object_key(k: ObjectKey) -> dict[str, Any]:
     return {
         "chunk_hash": k.chunk_hash,
-        "model_name": k.model_name,
         "kv_rank": k.kv_rank,
         "object_group_id": k.object_group_id,
-        "cache_salt": k.cache_salt,
         "namespace": msgspec.to_builtins(k.namespace),
     }
 
 
 def _dec_object_key(d: dict[str, Any]) -> ObjectKey:
+    namespace = {
+        "model_name": d.get("model_name", ""),
+        "cache_salt": d.get("cache_salt", ""),
+        **d.get("namespace", {}),
+    }
     return ObjectKey(
         chunk_hash=d["chunk_hash"],
-        model_name=d["model_name"],
+        namespace=msgspec.convert(namespace, type=CacheNamespace),
         kv_rank=d["kv_rank"],
         object_group_id=d.get("object_group_id", 0),
-        cache_salt=d.get("cache_salt", ""),
-        namespace=msgspec.convert(d.get("namespace", {}), type=CacheNamespace),
     )
 
 

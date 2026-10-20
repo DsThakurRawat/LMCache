@@ -28,6 +28,7 @@ from lmcache.integration.sglang.lmcache_mp_metadata import (
     LMCacheStoreOperation,
     SGLangKVComponentGroup,
 )
+from lmcache.v1.cache_namespace import CacheNamespace
 
 if TYPE_CHECKING:
     # First Party
@@ -610,19 +611,20 @@ class UnifiedLMCacheMPConnector:
         from lmcache.v1.multiprocess.custom_types import IPCCacheServerKey
 
         return IPCCacheServerKey(
-            model_name=self.model_name,
+            namespace=CacheNamespace(
+                model_name=self.model_name, cache_salt=operation.cache_salt
+            ),
             world_size=self.kv_world_size,
             worker_id=worker_id,
             # Sharded KV has one reader per object. TP-replicated MLA maps all
             # TP ranks in a PP stage to one object, so lookup must reserve one
             # read lock for every rank that retrieves that object.
-            num_kv_readers=self.num_kv_readers,
             token_ids=tuple(operation.token_ids),
             start=start,
             end=end,
             request_id=operation.request_id,
-            cache_salt=operation.cache_salt,
             request_configs=request_configs,
+            num_kv_readers=self.num_kv_readers,
         )
 
     def submit_lookup(

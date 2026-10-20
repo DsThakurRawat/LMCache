@@ -63,7 +63,7 @@ def make_object_key(chunk_id: int) -> ObjectKey:
     """Create a test ObjectKey with the given chunk ID."""
     return ObjectKey(
         chunk_hash=ObjectKey.IntHash2Bytes(chunk_id),
-        model_name="test_model",
+        namespace=CacheNamespace(model_name="test_model"),
         kv_rank=0,
     )
 
@@ -826,14 +826,14 @@ def test_namespace_splits_store_batches(
     )
     base = replace(
         make_object_key(0),
-        namespace=CacheNamespace(tags={"dtype": "bf16"}),
+        namespace=CacheNamespace(model_name="model", tags={"dtype": "bf16"}),
     )
     keys = [
         base,
         replace(
             base,
             chunk_hash=ObjectKey.IntHash2Bytes(1),
-            namespace=CacheNamespace(tags={"dtype": "fp8"}),
+            namespace=CacheNamespace(model_name="model", tags={"dtype": "fp8"}),
         ),
         replace(
             base,

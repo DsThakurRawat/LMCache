@@ -28,6 +28,7 @@ import pytest
 import torch
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.l2_adapters.valkey_l2_adapter import (
     ValkeyL2Adapter,
@@ -50,9 +51,8 @@ def create_object_key(
 ) -> ObjectKey:
     return ObjectKey(
         chunk_hash=ObjectKey.IntHash2Bytes(chunk_id),
-        model_name=model_name,
+        namespace=CacheNamespace(model_name=model_name, cache_salt=cache_salt),
         kv_rank=0,
-        cache_salt=cache_salt,
     )
 
 

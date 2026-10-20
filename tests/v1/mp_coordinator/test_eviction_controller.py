@@ -39,9 +39,8 @@ from lmcache.v1.mp_coordinator.views.usage_manager import CacheUsageManager
 def _make_key(salt: str, model: str = "m", rank: int = 0, h: str = "aa") -> ObjectKey:
     return ObjectKey(
         chunk_hash=bytes.fromhex(h),
-        model_name=model,
+        namespace=CacheNamespace(model_name=model, cache_salt=salt),
         kv_rank=rank,
-        cache_salt=salt,
     )
 
 
@@ -385,11 +384,13 @@ async def test_execute_evictions_dispatches_to_registered_instance():
         "keys": [
             {
                 "chunk_hash_hex": "aa",
-                "model_name": "m",
                 "kv_rank": 0,
                 "object_group_id": 0,
-                "cache_salt": "alice",
-                "namespace": {"kv_encoding": None, "tags": {}},
+                "namespace": {
+                    "model_name": "m",
+                    "cache_salt": "alice",
+                    "tags": {},
+                },
             }
         ]
     }
@@ -1007,10 +1008,12 @@ def test_pin_capture_restore_keeps_namespace() -> None:
     source, _, _ = _setup()
     key = replace(
         _make_key("tenant"),
-        namespace=CacheNamespace(tags={"dtype": "bf16"}),
+        namespace=CacheNamespace(model_name="model", tags={"dtype": "bf16"}),
     )
     source.pin([key])
     restored, _, _ = _setup()
     restored.restore(source.capture())
-    incompatible = replace(key, namespace=CacheNamespace(tags={"dtype": "fp8"}))
+    incompatible = replace(
+        key, namespace=CacheNamespace(model_name="model", tags={"dtype": "fp8"})
+    )
     assert restored.filter_unpinned([key, incompatible]) == [incompatible]

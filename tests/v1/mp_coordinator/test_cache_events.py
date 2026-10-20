@@ -16,6 +16,7 @@ import numpy as np
 import pytest
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import (
     CapacitySnapshot,
     L1BackendType,
@@ -56,7 +57,11 @@ import lmcache.v1.mp_coordinator.cache_events as cache_events
 
 
 def _key(hash_byte: int) -> ObjectKey:
-    return ObjectKey(chunk_hash=bytes([hash_byte]) * 4, model_name="m", kv_rank=0)
+    return ObjectKey(
+        chunk_hash=bytes([hash_byte]) * 4,
+        namespace=CacheNamespace(model_name="m"),
+        kv_rank=0,
+    )
 
 
 # The namespace ``_key`` stores in; fragment queries must ask from it.
@@ -204,7 +209,11 @@ def test_tokens_event_stamps_store_entries():
     sink = _RecordingSink()
     subscriber = _subscriber(sink)
 
-    rank1_key = ObjectKey(chunk_hash=_key(1).chunk_hash, model_name="m", kv_rank=1)
+    rank1_key = ObjectKey(
+        chunk_hash=_key(1).chunk_hash,
+        namespace=CacheNamespace(model_name="m"),
+        kv_rank=1,
+    )
     _dispatch(
         subscriber,
         Event(

@@ -15,6 +15,7 @@ import pytest
 import torch
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.internal_api import L2AdapterListener
 from lmcache.v1.distributed.l2_adapters import create_l2_adapter
@@ -38,7 +39,7 @@ TEST_TABLE = "test-table"
 def create_object_key(chunk_id: int, model_name: str = "test-model") -> ObjectKey:
     return ObjectKey(
         chunk_hash=chunk_id.to_bytes(4, byteorder="big"),
-        model_name=model_name,
+        namespace=CacheNamespace(model_name=model_name),
         kv_rank=0,
     )
 

@@ -5,6 +5,7 @@
 from unittest.mock import MagicMock
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import (
     AttnWindowDesc,
     GroupedObjectKeys,
@@ -21,14 +22,14 @@ from lmcache.v1.multiprocess.modules.lookup import LookupModule
 def _lookup_key(world_size: int) -> IPCCacheServerKey:
     """A lookup-side IPC key (worker_id None -> expand over all workers)."""
     return IPCCacheServerKey(
-        model_name="m",
+        namespace=CacheNamespace(model_name="m"),
         world_size=world_size,
-        num_kv_readers=1,
         worker_id=None,
         token_ids=(0,),
         start=0,
         end=0,
         request_id="r",
+        num_kv_readers=1,
     )
 
 
@@ -117,14 +118,14 @@ def test_lookup_hashing_stops_at_key_end() -> None:
     ctx.layout_desc_registry.find.return_value = MagicMock()
     ctx.token_hasher.compute_chunk_hashes.return_value = []
     key = IPCCacheServerKey(
-        model_name="m",
+        namespace=CacheNamespace(model_name="m"),
         world_size=1,
-        num_kv_readers=1,
         worker_id=None,
         token_ids=tuple(range(32)),
         start=0,
         end=16,
         request_id="r",
+        num_kv_readers=1,
     )
 
     LookupModule(ctx).lookup(key, tp_size=1)

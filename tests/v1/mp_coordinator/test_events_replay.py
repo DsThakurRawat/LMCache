@@ -10,6 +10,7 @@ in-process ASGI transport. Everything runs on CPU.
 from __future__ import annotations
 
 # Standard
+from dataclasses import asdict
 from typing import Any
 import asyncio
 import time
@@ -20,6 +21,7 @@ import httpx
 import pytest
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import ObjectKey, Tier
 from lmcache.v1.mp_coordinator.api import (
     CACHE_EVENT_SCHEMA_VERSION,
@@ -57,7 +59,9 @@ def _reset_trace_gate():
 
 def _key(chunk: str) -> ObjectKey:
     return ObjectKey(
-        chunk_hash=bytes.fromhex(chunk), model_name="m", kv_rank=0, cache_salt="alice"
+        chunk_hash=bytes.fromhex(chunk),
+        namespace=CacheNamespace(model_name="m", cache_salt="alice"),
+        kv_rank=0,
     )
 
 
@@ -326,7 +330,7 @@ async def _instances(client: httpx.AsyncClient) -> list[dict[str, Any]]:
 async def _placements(client: httpx.AsyncClient, chunk: str) -> int:
     response = await client.post(
         "/directory/lookup",
-        json={"keys": [_key(chunk).to_encoded_object_key().__dict__]},
+        json={"keys": [asdict(_key(chunk).to_encoded_object_key())]},
     )
     response.raise_for_status()
     return len(response.json()["results"][0]["placements"])

@@ -865,10 +865,13 @@ List cached keys and their placements, one page at a time.
         {
           "key": {
             "chunk_hash_hex": "aa12...",
-            "model_name": "meta-llama/Llama-3.1-8B-Instruct",
             "kv_rank": 0,
             "object_group_id": 0,
-            "cache_salt": ""
+            "namespace": {
+              "model_name": "meta-llama/Llama-3.1-8B-Instruct",
+              "cache_salt": "",
+              "tags": {}
+            }
           },
           "placements": [
             {
@@ -947,10 +950,13 @@ forms -- supply exactly one:
       "keys": [
         {
           "chunk_hash_hex": "aa12...",
-          "model_name": "meta-llama/Llama-3.1-8B-Instruct",
           "kv_rank": 0,
           "object_group_id": 0,
-          "cache_salt": ""
+          "namespace": {
+            "model_name": "meta-llama/Llama-3.1-8B-Instruct",
+            "cache_salt": "",
+            "tags": {}
+          }
         }
       ]
     }
@@ -963,13 +969,31 @@ forms -- supply exactly one:
       "chunks": 1,
       "results": [
         {
-          "key": {"chunk_hash_hex": "aa12...", "model_name": "...", "kv_rank": 0,
-                  "object_group_id": 0, "cache_salt": ""},
+          "key": {
+            "chunk_hash_hex": "aa12...",
+            "kv_rank": 0,
+            "object_group_id": 0,
+            "namespace": {
+              "model_name": "...",
+              "cache_salt": "",
+              "tags": {}
+            }
+          },
           "placements": [
-            {"instance_id": "server-1", "incarnation": 1770000000, "tier": "l1",
-             "backend": "dram", "size_bytes": 8388608, "shared": false}
+            {
+              "instance_id": "server-1",
+              "incarnation": 1770000000,
+              "tier": "l1",
+              "backend": "dram",
+              "size_bytes": 8388608,
+              "shared": false
+            }
           ],
-          "token_ids": [15496, 11, 995],
+          "token_ids": [
+            15496,
+            11,
+            995
+          ],
           "access_count": 7
         }
       ]
@@ -1003,7 +1027,7 @@ of ``access`` events applied to the key, ``0`` for unknown keys.
     # Keys form -- keys taken from GET /directory/keys:
     curl -s -X POST http://localhost:9300/directory/lookup \
       -H 'Content-Type: application/json' \
-      -d '{"keys": [{"chunk_hash_hex": "aa12...", "model_name": "m", "kv_rank": 0}]}'
+      -d '{"keys": [{"chunk_hash_hex": "aa12...", "kv_rank": 0, "namespace": {"model_name": "m", "cache_salt": "", "tags": {}}}]}'
 
 Cache control
 -------------
@@ -1294,10 +1318,13 @@ List the keys currently pinned in the L2 eviction plan.
         {
           "key": {
             "chunk_hash_hex": "aa12...",
-            "model_name": "Qwen/Qwen3-8B",
             "kv_rank": 0,
             "object_group_id": 0,
-            "cache_salt": "user-a"
+            "namespace": {
+              "model_name": "Qwen/Qwen3-8B",
+              "cache_salt": "user-a",
+              "tags": {}
+            }
           },
           "pin_count": 2
         }

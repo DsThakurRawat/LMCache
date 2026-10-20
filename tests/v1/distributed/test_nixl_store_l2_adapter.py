@@ -20,6 +20,7 @@ import torch
 
 # First Party
 from lmcache import torch_device_type
+from lmcache.v1.cache_namespace import CacheNamespace
 
 nixl = pytest.importorskip("nixl")
 if torch_device_type == "xpu":
@@ -91,7 +92,7 @@ def create_object_key(chunk_id: int, model_name: str = "test_model") -> ObjectKe
     """Create a test ObjectKey with the given chunk ID."""
     return ObjectKey(
         chunk_hash=ObjectKey.IntHash2Bytes(chunk_id),
-        model_name=model_name,
+        namespace=CacheNamespace(model_name=model_name),
         kv_rank=0,
     )
 

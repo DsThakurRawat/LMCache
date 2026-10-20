@@ -17,6 +17,7 @@ import requests
 import uvicorn
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import ObjectKey, Tier
 from lmcache.v1.mp_coordinator.api import (
     CacheEventBatch,
@@ -87,7 +88,7 @@ def _key(hash_byte: int) -> ObjectKey:
     """Build one integration-test object key."""
     return ObjectKey(
         chunk_hash=bytes([hash_byte]) * 4,
-        model_name="integration-model",
+        namespace=CacheNamespace(model_name="integration-model"),
         kv_rank=0,
     )
 

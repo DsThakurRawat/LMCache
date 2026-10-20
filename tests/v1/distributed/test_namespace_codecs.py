@@ -11,7 +11,7 @@ import subprocess
 import pytest
 
 # First Party
-from lmcache.v1.cache_namespace import CacheNamespace, KVCacheEncoding
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import ObjectKey
 from lmcache.v1.distributed.l2_adapters.bigtable_key_encoder import BigtableL2KeyEncoder
 from lmcache.v1.distributed.l2_adapters.fs_l2_adapter import (
@@ -34,13 +34,17 @@ from lmcache.v1.mp_observability.trace.codecs import decode_value, encode_value
 @pytest.mark.parametrize("salt", ["", "tenant"])
 def test_backend_names_recovery_and_trace(salt: str) -> None:
     key = ObjectKey(
-        b"1234",
-        "org/model",
-        1,
-        cache_salt=salt,
-        namespace=CacheNamespace(KVCacheEncoding("bf16", "NHD"), {"v": "1"}),
+        chunk_hash=b"1234",
+        namespace=CacheNamespace(
+            model_name="org/model",
+            tags={"v": "1"},
+            cache_salt=salt,
+        ),
+        kv_rank=1,
     )
-    other = replace(key, namespace=CacheNamespace(tags={"dtype": "fp8"}))
+    other = replace(
+        key, namespace=CacheNamespace(model_name="model", tags={"dtype": "fp8"})
+    )
     for encode in (
         _object_key_to_filename,
         _object_key_to_string,
@@ -65,7 +69,9 @@ def test_backend_names_recovery_and_trace(salt: str) -> None:
 
 def test_fs_rejects_invalid_or_overlong_namespace() -> None:
     key = ObjectKey(
-        b"1234", "model", 1, namespace=CacheNamespace(tags={"large": "a" * 200})
+        chunk_hash=b"1234",
+        namespace=CacheNamespace(model_name="model", tags={"large": "a" * 200}),
+        kv_rank=1,
     )
     with pytest.raises(ValueError, match="NAME_MAX"):
         _object_key_to_filename(key)
@@ -97,13 +103,14 @@ int main(int argc, char** argv) {
         capture_output=True,
     )
     for salt in ("", "tenant"):
-        for namespace in (CacheNamespace(), CacheNamespace(tags={"dtype": "bf16"})):
+        for namespace in (
+            CacheNamespace(model_name="model"),
+            CacheNamespace(model_name="model", tags={"dtype": "bf16"}),
+        ):
             key = ObjectKey(
-                b"1234",
-                "org/model",
-                1,
-                cache_salt=salt,
-                namespace=namespace,
+                chunk_hash=b"1234",
+                namespace=replace(namespace, model_name="org/model", cache_salt=salt),
+                kv_rank=1,
             )
             wire = _object_key_to_string(key)
             result = subprocess.check_output(
@@ -114,12 +121,15 @@ int main(int argc, char** argv) {
 
 def test_bigtable_extended_unsalted_cannot_alias_legacy_salt() -> None:
     extended = ObjectKey(
-        b"1234", "model", 1, namespace=CacheNamespace(tags={"dtype": "bf16"})
+        chunk_hash=b"1234",
+        namespace=CacheNamespace(model_name="model", tags={"dtype": "bf16"}),
+        kv_rank=1,
     )
     legacy = replace(
         extended,
-        namespace=CacheNamespace(),
-        cache_salt=extended.namespace.to_token(),
+        namespace=CacheNamespace(
+            model_name="model", cache_salt=extended.namespace.to_token()
+        ),
     )
     encoder = BigtableL2KeyEncoder()
     assert encoder.encode_row_key(extended) != encoder.encode_row_key(legacy)

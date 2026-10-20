@@ -23,6 +23,7 @@ import pytest
 import torch
 
 # First Party
+from lmcache.v1.cache_namespace import CacheNamespace
 from lmcache.v1.distributed.api import (
     L1BackendType,
     MemoryLayoutDesc,
@@ -94,7 +95,7 @@ def _open_fd_count(path: str) -> int:
 def _key(seed: int = 0) -> ObjectKey:
     return ObjectKey(
         chunk_hash=seed.to_bytes(4, "big") + b"\0" * 28,
-        model_name="devdax-l1-test",
+        namespace=CacheNamespace(model_name="devdax-l1-test"),
         kv_rank=0,
     )
 

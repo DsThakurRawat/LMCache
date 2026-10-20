@@ -43,14 +43,17 @@ def _key(
     parallel setup the blend namespace is derived from."""
     return {
         "chunk_hash_hex": h,
-        "model_name": model,
         "kv_rank": ObjectKey.ComputeKVRank(
             world_size=world_size,
             global_rank=rank,
             local_world_size=world_size,
             local_rank=rank,
         ),
-        "cache_salt": salt,
+        "namespace": {
+            "model_name": model,
+            "cache_salt": salt,
+            "tags": {},
+        },
     }
 
 
