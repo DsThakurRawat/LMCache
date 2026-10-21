@@ -180,8 +180,9 @@ class IPCCacheServerKey:
 
 `IPCCacheServerKey` retains the dev definition and carries request-specific
 configuration through `request_configs`. The server extracts matching tags
-from `lmcache.tag.*` and transient L1 attrs from `lmcache.xattr.*` when it builds
-ObjectKeys. Object/P2P projections carry object identity without transient attrs.
+from `lmcache.tag.*` and L1 xattrs from `lmcache.xattr.*` when it builds
+ObjectKeys. P2P carries object identity and xattrs; control-plane addressing
+projects identity only.
 Existing untagged L2 names retain their model/salt positions.
 
 ### 3. Dynamic Per-User Quotas via `QuotaManager`

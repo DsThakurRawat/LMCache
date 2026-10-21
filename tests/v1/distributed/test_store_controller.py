@@ -844,13 +844,21 @@ def test_namespace_splits_store_batches(
             base,
             identity=replace(base.identity, chunk_hash=ObjectKey.IntHash2Bytes(2)),
         ),
+        replace(
+            base,
+            identity=replace(
+                base.identity,
+                chunk_hash=ObjectKey.IntHash2Bytes(3),
+                cache_salt="another-tenant",
+            ),
+        ),
     ]
     try:
         # Queue all writes before starting the consumer to exercise one batch.
-        assert len(write_keys_to_l1(l1_manager, keys, make_layout())) == 3
+        assert len(write_keys_to_l1(l1_manager, keys, make_layout())) == 4
         ctrl.start()
-        assert wait_for_condition(lambda: adapter.debug_get_stored_object_count() == 3)
-        assert sorted(len(batch) for batch in batches) == [1, 2]
+        assert wait_for_condition(lambda: adapter.debug_get_stored_object_count() == 4)
+        assert sorted(len(batch) for batch in batches) == [1, 3]
         assert all(
             len({tuple(key.identity.tags.items()) for key in batch}) == 1
             for batch in batches

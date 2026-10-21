@@ -160,7 +160,8 @@ def _enc_object_key(k: ObjectKey) -> dict[str, Any]:
             "object_group_id": k.object_group_id,
             "cache_salt": k.cache_salt,
             "tags": dict(k.identity.tags),
-        }
+        },
+        "xattrs": dict(k.xattrs),
     }
 
 
@@ -174,7 +175,8 @@ def _dec_object_key(d: dict[str, Any]) -> ObjectKey:
             object_group_id=fields.get("object_group_id", 0),
             cache_salt=fields.get("cache_salt", ""),
             tags=fields.get("tags", {}),
-        )
+        ),
+        xattrs=d.get("xattrs", {}),
     )
 
 

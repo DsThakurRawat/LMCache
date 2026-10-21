@@ -1,7 +1,7 @@
-Cache identity and L1 attributes
+Cache identity and L1 xattrs
 ================================
 
-Clients pass matching tags and transient attributes through the existing
+Clients pass matching tags and xattrs through the existing
 ``IPCCacheServerKey.request_configs`` dictionary. The IPC key and its wire
 schema retain their dev definitions.
 
@@ -14,24 +14,28 @@ schema retain their dev definitions.
    }
 
 The server extracts ``lmcache.tag.*`` into ``ObjectKey.identity.tags`` and
-``lmcache.xattr.*`` into ``ObjectKey.attrs``, removing each prefix. Unrelated
+``lmcache.xattr.*`` into ``ObjectKey.xattrs``, removing each prefix. Unrelated
 request configurations keep their existing meaning. Tags use nonempty names
-and string values; attrs preserve their request-config values.
+and string values; xattrs preserve their request-config values.
 
 ``ObjectKeyIdentity`` contains ``chunk_hash``, ``kv_rank``, ``model_name``,
 ``object_group_id``, ``cache_salt`` and immutable, name-sorted ``tags``.
 Read-only key properties forward reads to the identity without duplicating it.
 
-``attrs`` is mutable, copied per object and excluded from equality/hashing.
+``xattrs`` is mutable, copied per object and excluded from equality/hashing.
 An L1 consumer can delete one attribute directly:
 
 .. code-block:: python
 
-   owner = key.attrs.pop("owner", None)
+   owner = key.xattrs.pop("owner", None)
 
-Changing attrs does not change a cache hit or create another entry. Attrs are
-omitted from L2 store queues, P2P messages, persistent key names, HTTP/JSON key
-projections, traces and coordinator captures/pins.
+Changing xattrs does not change a cache hit or create another entry.
+Forwarding, store queues and temporary keys preserve xattrs; consumers decide
+which entries to remove. P2P messages and operation traces carry xattrs.
+
+The internal P2P schema assumes both services upgrade together and has no
+legacy field reservations. Persistent key names, HTTP/control-plane identity
+projections and coordinator captures/pins do not include xattrs.
 
 L2 adapters call ``ObjectKey.to_storage_key()``, ``to_filename()`` or
 ``format_storage_key()``. Untagged names remain unchanged; sorted tags use a

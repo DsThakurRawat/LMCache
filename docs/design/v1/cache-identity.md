@@ -1,4 +1,4 @@
-# Cache identity and transient L1 attributes
+# Cache identity and L1 xattrs
 
 ## Request transport
 
@@ -15,11 +15,11 @@ request_configs = {
 ```
 
 Server-side IPC-to-object expansion strips `lmcache.tag.` into matching tags
-and `lmcache.xattr.` into transient attributes. Other request configurations
+and `lmcache.xattr.` into xattrs. Other request configurations
 remain available to their existing consumers. Tags require nonempty names and
 string values. Xattrs preserve their request-config values.
 
-## Object identity and attrs
+## Object identity and xattrs
 
 `ObjectKeyIdentity` contains `chunk_hash`, `kv_rank`, `model_name`,
 `object_group_id`, `cache_salt` and `tags`. Tags are copied into an immutable
@@ -27,12 +27,12 @@ mapping sorted by name. Insertion order cannot change equality, hashing,
 serialization or storage names. Explicit interpreted identity fields remain
 typed; opaque matching dimensions use tags.
 
-`ObjectKey.attrs` is a separate mutable dictionary, excluded from equality,
+`ObjectKey.xattrs` is a separate mutable dictionary, excluded from equality,
 hashing and storage names. Every expanded object receives its own dictionary.
 An L1 consumer can remove an attribute without changing object identity:
 
 ```python
-owner = key.attrs.pop("owner", None)
+owner = key.xattrs.pop("owner", None)
 ```
 
 Changing xattrs does not create another cache entry. Model/salt validation and
@@ -45,14 +45,19 @@ IPC equality still ignores `request_configs`, as on dev. Session lock release
 therefore compares extracted matching tags explicitly. Pending SHM transfers
 include canonical tags in their server-side lookup key, so otherwise equal IPC
 requests with different tags do not overwrite or commit each other's state.
-Store batching groups by rank, model, salt and tags, allowing compatible chunks
+Store batching groups by model, rank and tags, allowing compatible chunks
 to share a batch.
 
-Attrs are available during L1 insertion. L2 store queues and P2P lookup/unlock
-calls remove them using `ObjectKey.without_attrs()`. The explicit P2P gRPC codec
-and HTTP/JSON projections carry identity only; transient attrs do not add proto
-fields. Traces, coordinator captures/pins and serde temporary keys also omit
-attrs. L2 adapters obtain names and shards through key methods.
+Xattrs are available during L1 insertion. Consumers remove individual entries
+with `pop`; key forwarding, store queues and temporary serde keys preserve the
+dictionary. The implementation does not automatically clear xattrs.
+
+P2P messages carry identity and encoded xattrs through the existing structural
+gRPC codec. Both services upgrade together; the internal P2P schema has no
+legacy field reservations. Traces preserve xattrs for operation replay.
+HTTP/control-plane projections, coordinator captures/pins and persistent key
+names address identity only. L2 adapters obtain names and shards through key
+methods; xattrs never affect those names.
 
 ```text
 no tags, no salt: <model>@<rank>@<group>@<hash>
@@ -75,6 +80,6 @@ hexadecimal chunk hashes for JSON. Legacy untagged L2 data, flattened trace/pin
 records and positional coordinator captures remain readable.
 
 This PR does not predefine KV encoding fields or activate an engine precision
-producer. Tests cover request-config extraction, sorted tags, mutable attrs,
+producer. Tests cover request-config extraction, sorted tags, mutable xattrs,
 identity isolation, session/transfer separation, protocol projections and L2
 naming. CPU checks do not establish hardware inference correctness.

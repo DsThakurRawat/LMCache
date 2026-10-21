@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Typed identities for token requests and stored objects."""
+"""Object identities and request-config extensions."""
 
 # Standard
 from collections.abc import Mapping
@@ -80,8 +80,8 @@ def get_request_tags(request_configs: Mapping[str, Any] | None) -> Mapping[str, 
     )
 
 
-def get_request_attrs(request_configs: Mapping[str, Any] | None) -> dict[str, Any]:
-    """Extract transient L1 attributes from request configuration."""
+def get_request_xattrs(request_configs: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Extract L1 xattrs from request configuration."""
     return {
         name.removeprefix("lmcache.xattr."): value
         for name, value in (request_configs or {}).items()
@@ -157,7 +157,3 @@ class EncodedObjectKeyIdentity:
                 tuple(self.tags.items()),
             )
         )
-
-    def tags_token(self) -> str:
-        """Return the canonical encoding of opaque matching tags."""
-        return encode_tags(self.tags)

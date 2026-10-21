@@ -191,14 +191,14 @@ class Session:
                 return None
 
             same_lookup = (
-                key.world_size == lookup_key.world_size
+                key.model_name == lookup_key.model_name
+                and key.world_size == lookup_key.world_size
                 and key.token_ids == lookup_key.token_ids
-                and key.model_name == lookup_key.model_name
                 and key.cache_salt == lookup_key.cache_salt
-                and get_request_tags(key.request_configs)
-                == get_request_tags(lookup_key.request_configs)
                 and key.start >= lookup_key.start
                 and key.end <= lookup_key.end
+                and get_request_tags(key.request_configs)
+                == get_request_tags(lookup_key.request_configs)
             )
             if not same_lookup:
                 return None
@@ -238,14 +238,14 @@ class Session:
                 return False
 
             same_lookup = (
-                key.world_size == lookup_key.world_size
+                key.model_name == lookup_key.model_name
+                and key.world_size == lookup_key.world_size
                 and key.token_ids == lookup_key.token_ids
-                and key.model_name == lookup_key.model_name
                 and key.cache_salt == lookup_key.cache_salt
-                and get_request_tags(key.request_configs)
-                == get_request_tags(lookup_key.request_configs)
                 and key.start >= lookup_key.start
                 and key.end <= lookup_key.end
+                and get_request_tags(key.request_configs)
+                == get_request_tags(lookup_key.request_configs)
             )
             if not same_lookup:
                 return False

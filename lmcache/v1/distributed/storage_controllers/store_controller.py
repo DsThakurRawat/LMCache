@@ -49,18 +49,17 @@ STORE_LOOP_POLL_TIMEOUT_MS = 500
 
 def _group_keys_by_shape(
     keys: list[ObjectKey],
-) -> dict[tuple[int, str, str, tuple[tuple[str, str], ...]], list[ObjectKey]]:
-    """Group compatible chunks by rank, model, isolation salt and tags."""
+) -> dict[tuple[str, int, tuple[tuple[str, str], ...]], list[ObjectKey]]:
+    """Group compatible chunks by model, rank and representation tags."""
     groups: dict[
-        tuple[int, str, str, tuple[tuple[str, str], ...]],
+        tuple[str, int, tuple[tuple[str, str], ...]],
         list[ObjectKey],
     ] = defaultdict(list)
     for key in keys:
         groups[
             (
-                key.kv_rank,
                 key.model_name,
-                key.cache_salt,
+                key.kv_rank,
                 tuple(key.identity.tags.items()),
             )
         ].append(key)
@@ -132,7 +131,7 @@ class StoreListener(L1ManagerListener):
             keys (list[ObjectKey]): Keys that finished writing.
         """
         with self._lock:
-            self._pending_keys.extend(key.without_attrs() for key in keys)
+            self._pending_keys.extend(keys)
         self._event_fd.notify()
 
     def on_l1_keys_reserved_read(self, keys: list[ObjectKey]) -> None:

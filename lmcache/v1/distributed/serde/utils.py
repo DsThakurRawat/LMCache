@@ -49,7 +49,6 @@ def make_temp_key(original_key: ObjectKey) -> ObjectKey:
     """
     return replace(
         original_key,
-        attrs={},
         identity=replace(
             original_key.identity, chunk_hash=original_key.chunk_hash + os.urandom(16)
         ),

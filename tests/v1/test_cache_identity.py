@@ -90,7 +90,7 @@ def test_identity_transport_and_object_expansion() -> None:
         for key in (key for group in groups for key in group):
             assert key.model_name == ipc.model_name
             assert key.identity.tags == get_request_tags(ipc.request_configs)
-            assert key.attrs == {"owner": "alice", "priority": 1}
+            assert key.xattrs == {"owner": "alice", "priority": 1}
             encoded = key.to_encoded_object_key()
             assert (
                 codec.decode(codec.encode(encoded), type=type(encoded)).to_object_key()
@@ -134,7 +134,7 @@ def test_identity_protobuf_roundtrip() -> None:
         common_pb2.IpcCacheServerKey.FromString(message.SerializeToString())
     )
     assert recovered_ipc.request_configs == ipc.request_configs
-    key = ObjectKey(identity=identity, attrs={"owner": "alice"})
+    key = ObjectKey(identity=identity, xattrs={"owner": "alice"})
     encode, decode = compile_request_codec_for_types(
         p2p_service_pb2.P2pUnlockObjectsRequest, (list[ObjectKey],)
     )
@@ -142,7 +142,7 @@ def test_identity_protobuf_roundtrip() -> None:
     (keys,) = decode(type(message).FromString(message.SerializeToString()))
     assert keys == [key]
     assert list(keys[0].identity.tags) == ["app", "tenant"]
-    assert keys[0].attrs == {}
+    assert keys[0].xattrs == key.xattrs
 
 
 def test_session_release_checks_identity() -> None:
@@ -166,33 +166,32 @@ def test_session_release_checks_identity() -> None:
     assert session.claim_failed_retrieve_release(1, worker, snapshot[-1])
 
 
-def test_attrs_are_mutable_and_do_not_change_identity() -> None:
-    attrs = {"owner": "alice", "priority": 1}
+def test_xattrs_are_mutable_and_do_not_change_identity() -> None:
+    xattrs = {"owner": "alice", "priority": 1}
     key = ObjectKey(
         identity=ObjectKeyIdentity(chunk_hash=b"1234", kv_rank=0, model_name="model"),
-        attrs=attrs,
+        xattrs=xattrs,
     )
-    other = replace(key, attrs={"owner": "bob"})
+    other = replace(key, xattrs={"owner": "bob"})
     assert key == other and hash(key) == hash(other)
     assert key.to_storage_key() == other.to_storage_key()
-    assert key.to_encoded_object_key().to_object_key().attrs == {}
-    assert key.without_attrs().attrs == {}
-    assert key.attrs.pop("owner") == "alice"
-    assert key.attrs == {"priority": 1}
-    assert attrs["owner"] == "alice"
+    assert key.to_encoded_object_key().to_object_key().xattrs == {}
+    assert key.xattrs.pop("owner") == "alice"
+    assert key.xattrs == {"priority": 1}
+    assert xattrs["owner"] == "alice"
     assert key == other and hash(key) == hash(other)
 
 
-def test_l2_queue_omits_l1_attrs() -> None:
+def test_store_queue_preserves_xattrs() -> None:
     key = ObjectKey(
         identity=ObjectKeyIdentity(chunk_hash=b"1234", kv_rank=0, model_name="model"),
-        attrs={"owner": "alice"},
+        xattrs={"owner": "alice"},
     )
     listener = StoreListener()
     try:
         listener.on_l1_keys_write_finished([key])
         [queued] = listener.pop_pending_keys()
-        assert queued == key and queued.attrs == {}
-        assert key.attrs == {"owner": "alice"}
+        assert queued == key and queued.xattrs == key.xattrs
+        assert key.xattrs == {"owner": "alice"}
     finally:
         listener.close()

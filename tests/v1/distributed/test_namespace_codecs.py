@@ -40,7 +40,8 @@ def test_backend_names_recovery_and_trace(salt: str) -> None:
             cache_salt=salt,
             chunk_hash=b"1234",
             kv_rank=1,
-        )
+        ),
+        xattrs={"owner": "alice"},
     )
     other = replace(
         key,
@@ -65,9 +66,14 @@ def test_backend_names_recovery_and_trace(salt: str) -> None:
     temp = make_temp_key(key)
     assert replace(temp.identity, chunk_hash=key.chunk_hash) == key.identity
     assert temp.chunk_hash != key.chunk_hash
+    assert temp.xattrs == key.xattrs
     traced = decode_value(encode_value(key))
     assert traced == key
     assert traced.identity == key.identity
+    assert traced.xattrs == key.xattrs
+    recorded = encode_value(key)
+    key.xattrs.pop("owner")
+    assert decode_value(recorded).xattrs == {"owner": "alice"}
 
 
 def test_fs_rejects_invalid_or_overlong_identity() -> None:
