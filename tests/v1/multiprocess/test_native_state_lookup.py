@@ -18,7 +18,6 @@ import torch
 
 # First Party
 from lmcache.lmcache_native import Bitmap, EngineKVFormat
-from lmcache.v1.cache_identity import IPCKeyIdentity
 from lmcache.v1.distributed.api import (
     MemoryLayoutDesc,
     ObjectKey,
@@ -161,16 +160,14 @@ def _groups() -> KVLayerGroupsManager:
 
 def _key(world_size: int = 1, tokens: tuple[int, ...] = TOKENS) -> IPCCacheServerKey:
     return IPCCacheServerKey(
-        identity=IPCKeyIdentity(
-            model_name="native-state",
-            world_size=world_size,
-            worker_id=None,
-        ),
-        request_id="native-request",
-        num_kv_readers=1,
+        model_name="native-state",
+        world_size=world_size,
+        worker_id=None,
         token_ids=tokens,
         start=0,
         end=len(tokens),
+        request_id="native-request",
+        num_kv_readers=1,
     )
 
 
@@ -190,7 +187,7 @@ def _lookup(
         key = replace(key, end=query_end)
     present: set[ObjectKey] = set()
     for rank, endpoints in enumerate(checkpoint_ends):
-        worker_key = replace(key, identity=replace(key.identity, worker_id=rank))
+        worker_key = replace(key, worker_id=rank)
         per_group = ipc_key_to_object_keys(worker_key, hashes, [0, 1])
         # Every native store contributes PAGE for its token range and only
         # one STATE object at its endpoint, exactly as the ATOM worker emits.

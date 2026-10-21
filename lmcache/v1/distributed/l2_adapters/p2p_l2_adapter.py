@@ -225,7 +225,9 @@ class P2PL2Adapter(L2AdapterInterface):
             )
             return task_id
 
-        future = self._req_client.p2p_lookup_and_lock(keys, group_layout_descs)
+        future = self._req_client.p2p_lookup_and_lock(
+            [key.without_attrs() for key in keys], group_layout_descs
+        )
         failed = False
         remote_task_id = -1
         try:
@@ -277,7 +279,7 @@ class P2PL2Adapter(L2AdapterInterface):
     def submit_unlock(self, keys: list[ObjectKey]) -> None:
         if not keys:
             return
-        self._req_client.p2p_unlock_objects(keys)
+        self._req_client.p2p_unlock_objects([key.without_attrs() for key in keys])
         for key in keys:
             self._remote_addresses.pop(key, None)
 

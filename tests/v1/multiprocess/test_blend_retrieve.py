@@ -14,7 +14,6 @@ import pytest
 
 # First Party
 from lmcache import device_ops  # noqa: F401
-from lmcache.v1.cache_identity import IPCKeyIdentity
 from lmcache.v1.multiprocess.modules.blend import retrieve as retrieve_mod
 from lmcache.v1.multiprocess.modules.blend.module import BlendModule
 from lmcache.v1.multiprocess.modules.blend.rope import _CBRopeState
@@ -697,16 +696,14 @@ def _run_unretrieved_lookup(blend, request_id: str, num_kv_readers: int = 1):
 
     query = list(range(50_000, 50_128)) + stored_tokens
     key = IPCCacheServerKey(
-        identity=IPCKeyIdentity(
-            model_name="m",
-            world_size=1,
-            worker_id=None,
-        ),
-        request_id=request_id,
+        model_name="m",
+        world_size=1,
         num_kv_readers=num_kv_readers,
+        worker_id=None,
         token_ids=tuple(query),
         start=0,
         end=len(query),
+        request_id=request_id,
     )
     result = blend.cb_unified_lookup(key, tp_size=1)
     assert result is not None
@@ -866,16 +863,14 @@ def _classify_key(request_id: str = "req-classify", num_kv_readers: int = 1):
     from lmcache.v1.multiprocess.custom_types import IPCCacheServerKey
 
     return IPCCacheServerKey(
-        identity=IPCKeyIdentity(
-            model_name="m",
-            world_size=1,
-            worker_id=None,
-        ),
-        request_id=request_id,
+        model_name="m",
+        world_size=1,
         num_kv_readers=num_kv_readers,
+        worker_id=None,
         token_ids=(1, 2, 3),
         start=0,
         end=3,
+        request_id=request_id,
     )
 
 

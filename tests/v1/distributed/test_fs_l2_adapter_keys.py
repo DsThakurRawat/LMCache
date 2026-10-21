@@ -303,15 +303,13 @@ class TestIPCCacheServerKeyCacheSalt:
         from lmcache.v1.multiprocess.custom_types import IPCCacheServerKey
 
         payload = {
-            "identity": {
-                "model_name": "m",
-                "world_size": 1,
-                "worker_id": 0,
-            },
-            "request_id": "r1",
+            "model_name": "m",
+            "world_size": 1,
+            "worker_id": 0,
             "token_ids": (1, 2),
             "start": 0,
             "end": 2,
+            "request_id": "r1",
         }
         wire = msgspec.msgpack.encode(payload)
         decoded = msgspec.msgpack.decode(wire, type=IPCCacheServerKey)

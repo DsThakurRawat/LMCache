@@ -23,7 +23,7 @@ import threading
 import pytest
 
 # First Party
-from lmcache.v1.cache_identity import IPCKeyIdentity, ObjectKeyIdentity
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import ObjectKey
 from lmcache.v1.multiprocess.custom_types import IPCCacheServerKey
 from lmcache.v1.multiprocess.modules.lookup import resolve_prefetched_obj_keys
@@ -61,16 +61,14 @@ class _FakeRequest:
 def _make_key(n_chunks: int, start_chunks: int = 0) -> IPCCacheServerKey:
     n_tokens = n_chunks * CHUNK_SIZE
     return IPCCacheServerKey(
-        identity=IPCKeyIdentity(
-            model_name="m",
-            world_size=1,
-            worker_id=None,
-        ),
         request_id="r",
         num_kv_readers=1,
         token_ids=tuple(range(n_tokens)),
         start=start_chunks * CHUNK_SIZE,
         end=n_tokens,
+        model_name="m",
+        world_size=1,
+        worker_id=None,
     )
 
 

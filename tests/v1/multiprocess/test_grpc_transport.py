@@ -19,7 +19,7 @@ import pytest
 import torch
 
 # First Party
-from lmcache.v1.cache_identity import IPCKeyIdentity, ObjectKeyIdentity
+from lmcache.v1.cache_identity import ObjectKeyIdentity
 from lmcache.v1.distributed.api import MemoryLayoutDesc, ObjectKey
 from lmcache.v1.distributed.transfer_channel.api import TransferChannelAddress
 from lmcache.v1.multiprocess.config import MPServerConfig
@@ -571,18 +571,16 @@ def test_generated_grpc_services_communicate_end_to_end(
 ) -> None:
     client, calls = grpc_client
     key = IPCCacheServerKey(
-        identity=IPCKeyIdentity(
-            model_name="model",
-            cache_salt="tenant",
-            world_size=2,
-            worker_id=None,
-        ),
         request_id="request",
         request_configs={"blend": True},
         num_kv_readers=2,
         token_ids=(1, 2, 3),
         start=0,
         end=3,
+        model_name="model",
+        cache_salt="tenant",
+        world_size=2,
+        worker_id=None,
     )
 
     assert client.lookup(key, 2).result(timeout=5) is None

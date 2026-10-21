@@ -14,7 +14,6 @@ import pytest
 # First Party
 from lmcache.integration.vllm.kv_cache_groups import get_tokens_per_block
 from lmcache.integration.vllm.vllm_multi_process_adapter import ParallelStrategy
-from lmcache.v1.cache_identity import IPCKeyIdentity
 from lmcache.v1.multiprocess.custom_types import IPCCacheServerKey
 
 # ``lmcache_mp_connector`` imports vLLM, but the k3 unit env runs without it
@@ -131,16 +130,14 @@ def test_non_mla_unaffected_by_dcp_field():
 
 def _reader_key(readers: int) -> IPCCacheServerKey:
     return IPCCacheServerKey(
-        identity=IPCKeyIdentity(
-            model_name="m",
-            world_size=8,
-            worker_id=0,
-        ),
-        request_id="req",
+        model_name="m",
+        world_size=8,
         num_kv_readers=readers,
+        worker_id=0,
         token_ids=(1, 2, 3),
         start=0,
         end=3,
+        request_id="req",
     )
 
 

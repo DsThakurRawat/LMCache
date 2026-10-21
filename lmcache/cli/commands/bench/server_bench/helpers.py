@@ -27,7 +27,6 @@ import urllib.request
 
 # First Party
 from lmcache import torch_dev, torch_device_type
-from lmcache.v1.cache_identity import IPCKeyIdentity
 
 # ``lmcache bench server`` allocates real CUDA tensors and talks to
 # the MP server via ZMQ, both of which are absent from the thin
@@ -166,16 +165,14 @@ def _make_key(
 ) -> IPCCacheServerKey:
     """Build an IPCCacheServerKey."""
     return IPCCacheServerKey(
-        identity=IPCKeyIdentity(
-            model_name=_MODEL_NAME,
-            world_size=world_size,
-            worker_id=worker_id,
-        ),
-        request_id=request_id,
+        model_name=_MODEL_NAME,
+        world_size=world_size,
         num_kv_readers=num_kv_readers,
+        worker_id=worker_id,
         token_ids=token_ids,
         start=start,
         end=end if end > 0 else len(token_ids),
+        request_id=request_id,
     )
 
 

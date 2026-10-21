@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Cache identity identity and transport contracts."""
+"""Cache identity, transient attributes and transport contracts."""
 
 # Standard
 from dataclasses import replace
@@ -9,8 +9,9 @@ import msgspec
 import pytest
 
 # First Party
-from lmcache.v1.cache_identity import ObjectKeyIdentity, decode_tags
+from lmcache.v1.cache_identity import ObjectKeyIdentity, decode_tags, get_request_tags
 from lmcache.v1.distributed.api import ObjectKey, ipc_key_to_object_keys
+from lmcache.v1.distributed.storage_controllers.store_controller import StoreListener
 from lmcache.v1.mp_coordinator.utils.encoding import decode_key, encode_key
 from lmcache.v1.multiprocess.custom_types import IPCCacheServerKey
 from lmcache.v1.multiprocess.session import Session
@@ -71,18 +72,25 @@ def test_identity_transport_and_object_expansion() -> None:
         None,
         [1, 2],
         end=2,
-        tags={"tenant": "a", "app": "v1"},
+        request_configs={
+            "lmcache.tag.tenant": "a",
+            "lmcache.tag.app": "v1",
+            "lmcache.xattr.owner": "alice",
+            "lmcache.xattr.priority": 1,
+            "lmcache.skip_load": True,
+        },
     )
     for codec in (msgspec.msgpack, msgspec.json):
         decoded = codec.decode(codec.encode(ipc), type=IPCCacheServerKey)
         assert decoded == ipc and hash(decoded) == hash(ipc)
-        assert list(decoded.identity.tags) == ["app", "tenant"]
-        assert decoded.identity.tags_token() == ipc.identity.tags_token()
+        assert list(get_request_tags(decoded.request_configs)) == ["app", "tenant"]
+        assert decoded.request_configs == ipc.request_configs
         groups = ipc_key_to_object_keys(decoded, [b"1234", b"5678"], [0, 1])
         assert len(groups) == 2 and all(len(group) == 4 for group in groups)
         for key in (key for group in groups for key in group):
-            assert key.identity.model_name == ipc.identity.model_name
-            assert key.identity.tags == ipc.identity.tags
+            assert key.model_name == ipc.model_name
+            assert key.identity.tags == get_request_tags(ipc.request_configs)
+            assert key.attrs == {"owner": "alice", "priority": 1}
             encoded = key.to_encoded_object_key()
             assert (
                 codec.decode(codec.encode(encoded), type=type(encoded)).to_object_key()
@@ -101,12 +109,10 @@ def test_identity_transport_and_object_expansion() -> None:
         replace(ipc, start=1),
         replace(ipc, end=1),
     ]
-    assert all(request.identity == ipc.identity for request in requests)
     assert len(set(requests)) == 4
     legacy = msgspec.to_builtins(ipc)
-    del legacy["identity"]
-    with pytest.raises(msgspec.ValidationError, match="identity"):
-        msgspec.convert(legacy, type=IPCCacheServerKey)
+    del legacy["cache_salt"]
+    assert msgspec.convert(legacy, type=IPCCacheServerKey).cache_salt == ""
 
 
 def test_identity_protobuf_roundtrip() -> None:
@@ -116,31 +122,27 @@ def test_identity_protobuf_roundtrip() -> None:
         model_name="model",
         tags={"tenant": "a", "app": "v1"},
     )
-    ipc = IPCCacheServerKey.from_token_ids("model", 1, 0, [1], tags=identity.tags)
-    key = ObjectKey(identity=identity)
-    for message_type, value in (
-        (common_pb2.IpcCacheServerKey, ipc),
-        (p2p_service_pb2.ObjectKey, key),
-    ):
-        encode, decode = compile_request_codec_for_types(message_type, (type(value),))
-        message = encode((value,), {})
-        assert message.identity.tags["tenant"] == "a"
-        assert message.identity.model_name == "model"
-        (recovered,) = decode(message_type.FromString(message.SerializeToString()))
-        assert recovered == value and hash(recovered) == hash(value)
-        assert list(recovered.identity.tags) == ["app", "tenant"]
-        assert recovered.identity.tags_token() == identity.tags_token()
-    _, decode = compile_request_codec_for_types(p2p_service_pb2.ObjectKey, (ObjectKey,))
-    (legacy,) = decode(
-        p2p_service_pb2.ObjectKey(
-            identity=common_pb2.ObjectKeyIdentity(
-                model_name="model", chunk_hash=b"1234"
-            )
-        )
+    ipc = IPCCacheServerKey.from_token_ids(
+        "model", 1, 0, [1], request_configs={"lmcache.tag.tenant": "a"}
     )
-    assert legacy.identity == ObjectKeyIdentity(
-        chunk_hash=b"1234", kv_rank=0, model_name="model"
+    encode, decode = compile_request_codec_for_types(
+        common_pb2.IpcCacheServerKey, (IPCCacheServerKey,)
     )
+    message = encode((ipc,), {})
+    assert message.model_name == "model"
+    (recovered_ipc,) = decode(
+        common_pb2.IpcCacheServerKey.FromString(message.SerializeToString())
+    )
+    assert recovered_ipc.request_configs == ipc.request_configs
+    key = ObjectKey(identity=identity, attrs={"owner": "alice"})
+    encode, decode = compile_request_codec_for_types(
+        p2p_service_pb2.P2pUnlockObjectsRequest, (list[ObjectKey],)
+    )
+    message = encode(([key],), {})
+    (keys,) = decode(type(message).FromString(message.SerializeToString()))
+    assert keys == [key]
+    assert list(keys[0].identity.tags) == ["app", "tenant"]
+    assert keys[0].attrs == {}
 
 
 def test_session_release_checks_identity() -> None:
@@ -150,15 +152,47 @@ def test_session_release_checks_identity() -> None:
         None,
         [1],
         end=1,
-        tags={"dtype": "bf16"},
+        request_configs={"lmcache.tag.dtype": "bf16"},
     )
     session = Session("r", TokenHasher(chunk_size=1))
     session.begin_lookup(lookup, (-1,))
     session.record_prefetch_result(1, (0,))
-    worker = replace(lookup, identity=replace(lookup.identity, worker_id=0))
+    worker = replace(lookup, worker_id=0)
     snapshot = session.prepare_failed_retrieve_release(worker)
     assert snapshot is not None
-    wrong = replace(worker, identity=replace(worker.identity, tags={"dtype": "fp8"}))
+    wrong = replace(worker, request_configs={"lmcache.tag.dtype": "fp8"})
     assert session.prepare_failed_retrieve_release(wrong) is None
     assert not session.claim_failed_retrieve_release(1, wrong, snapshot[-1])
     assert session.claim_failed_retrieve_release(1, worker, snapshot[-1])
+
+
+def test_attrs_are_mutable_and_do_not_change_identity() -> None:
+    attrs = {"owner": "alice", "priority": 1}
+    key = ObjectKey(
+        identity=ObjectKeyIdentity(chunk_hash=b"1234", kv_rank=0, model_name="model"),
+        attrs=attrs,
+    )
+    other = replace(key, attrs={"owner": "bob"})
+    assert key == other and hash(key) == hash(other)
+    assert key.to_storage_key() == other.to_storage_key()
+    assert key.to_encoded_object_key().to_object_key().attrs == {}
+    assert key.without_attrs().attrs == {}
+    assert key.attrs.pop("owner") == "alice"
+    assert key.attrs == {"priority": 1}
+    assert attrs["owner"] == "alice"
+    assert key == other and hash(key) == hash(other)
+
+
+def test_l2_queue_omits_l1_attrs() -> None:
+    key = ObjectKey(
+        identity=ObjectKeyIdentity(chunk_hash=b"1234", kv_rank=0, model_name="model"),
+        attrs={"owner": "alice"},
+    )
+    listener = StoreListener()
+    try:
+        listener.on_l1_keys_write_finished([key])
+        [queued] = listener.pop_pending_keys()
+        assert queued == key and queued.attrs == {}
+        assert key.attrs == {"owner": "alice"}
+    finally:
+        listener.close()

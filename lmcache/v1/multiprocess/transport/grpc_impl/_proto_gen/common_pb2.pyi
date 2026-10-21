@@ -6,30 +6,9 @@ from google.protobuf.internal import containers as _containers
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from collections.abc import Iterable as _Iterable, Mapping as _Mapping
-from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
+from typing import ClassVar as _ClassVar, Optional as _Optional
 
 DESCRIPTOR: _descriptor.FileDescriptor
-
-class IPCKeyIdentity(_message.Message):
-    __slots__ = ("world_size", "worker_id", "model_name", "cache_salt", "tags")
-    class TagsEntry(_message.Message):
-        __slots__ = ("key", "value")
-        KEY_FIELD_NUMBER: _ClassVar[int]
-        VALUE_FIELD_NUMBER: _ClassVar[int]
-        key: str
-        value: str
-        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
-    WORLD_SIZE_FIELD_NUMBER: _ClassVar[int]
-    WORKER_ID_FIELD_NUMBER: _ClassVar[int]
-    MODEL_NAME_FIELD_NUMBER: _ClassVar[int]
-    CACHE_SALT_FIELD_NUMBER: _ClassVar[int]
-    TAGS_FIELD_NUMBER: _ClassVar[int]
-    world_size: int
-    worker_id: int
-    model_name: str
-    cache_salt: str
-    tags: _containers.ScalarMap[str, str]
-    def __init__(self, world_size: _Optional[int] = ..., worker_id: _Optional[int] = ..., model_name: _Optional[str] = ..., cache_salt: _Optional[str] = ..., tags: _Optional[_Mapping[str, str]] = ...) -> None: ...
 
 class ObjectKeyIdentity(_message.Message):
     __slots__ = ("chunk_hash", "kv_rank", "model_name", "object_group_id", "cache_salt", "tags")
@@ -55,22 +34,28 @@ class ObjectKeyIdentity(_message.Message):
     def __init__(self, chunk_hash: _Optional[bytes] = ..., kv_rank: _Optional[int] = ..., model_name: _Optional[str] = ..., object_group_id: _Optional[int] = ..., cache_salt: _Optional[str] = ..., tags: _Optional[_Mapping[str, str]] = ...) -> None: ...
 
 class IpcCacheServerKey(_message.Message):
-    __slots__ = ("identity", "token_ids", "start", "end", "request_id", "encoded_request_configs", "num_kv_readers")
-    IDENTITY_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("model_name", "world_size", "worker_id", "token_ids", "start", "end", "request_id", "cache_salt", "encoded_request_configs", "num_kv_readers")
+    MODEL_NAME_FIELD_NUMBER: _ClassVar[int]
+    WORLD_SIZE_FIELD_NUMBER: _ClassVar[int]
+    WORKER_ID_FIELD_NUMBER: _ClassVar[int]
     TOKEN_IDS_FIELD_NUMBER: _ClassVar[int]
     START_FIELD_NUMBER: _ClassVar[int]
     END_FIELD_NUMBER: _ClassVar[int]
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    CACHE_SALT_FIELD_NUMBER: _ClassVar[int]
     ENCODED_REQUEST_CONFIGS_FIELD_NUMBER: _ClassVar[int]
     NUM_KV_READERS_FIELD_NUMBER: _ClassVar[int]
-    identity: IPCKeyIdentity
+    model_name: str
+    world_size: int
+    worker_id: int
     token_ids: _containers.RepeatedScalarFieldContainer[int]
     start: int
     end: int
     request_id: str
+    cache_salt: str
     encoded_request_configs: bytes
     num_kv_readers: int
-    def __init__(self, identity: _Optional[_Union[IPCKeyIdentity, _Mapping]] = ..., token_ids: _Optional[_Iterable[int]] = ..., start: _Optional[int] = ..., end: _Optional[int] = ..., request_id: _Optional[str] = ..., encoded_request_configs: _Optional[bytes] = ..., num_kv_readers: _Optional[int] = ...) -> None: ...
+    def __init__(self, model_name: _Optional[str] = ..., world_size: _Optional[int] = ..., worker_id: _Optional[int] = ..., token_ids: _Optional[_Iterable[int]] = ..., start: _Optional[int] = ..., end: _Optional[int] = ..., request_id: _Optional[str] = ..., cache_salt: _Optional[str] = ..., encoded_request_configs: _Optional[bytes] = ..., num_kv_readers: _Optional[int] = ...) -> None: ...
 
 class EventIpcHandleResult(_message.Message):
     __slots__ = ("event_ipc_handle", "success")

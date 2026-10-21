@@ -132,7 +132,7 @@ class StoreListener(L1ManagerListener):
             keys (list[ObjectKey]): Keys that finished writing.
         """
         with self._lock:
-            self._pending_keys.extend(keys)
+            self._pending_keys.extend(key.without_attrs() for key in keys)
         self._event_fd.notify()
 
     def on_l1_keys_reserved_read(self, keys: list[ObjectKey]) -> None:

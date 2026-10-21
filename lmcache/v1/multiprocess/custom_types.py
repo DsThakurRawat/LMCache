@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Standard
-from collections.abc import Mapping
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import Any, Callable
 
 # Third Party
@@ -9,7 +8,6 @@ import msgspec
 import torch
 
 # First Party
-from lmcache.v1.cache_identity import IPCKeyIdentity
 from lmcache.v1.platform.base.ipc_wrapper import (  # noqa: E402,F401
     DeviceIPCWrapper,
 )
@@ -35,21 +33,32 @@ class IPCCacheServerKey:
     The server computes chunk hashes via TokenHasher and converts to
     ObjectKey for storage operations using ipc_key_to_object_keys().
 
-    token_ids and [start, end) are request inputs outside identity, but still
-    participate in equality/hash comparisons to distinguish request addresses.
-
     The request_id field is for session tracking and is NOT included
     in equality/hash comparisons (two keys with same content but different
     request_ids are considered equal for cache purposes).
     """
 
-    identity: IPCKeyIdentity
-    token_ids: tuple[int, ...]
+    model_name: str
+    world_size: int
+    worker_id: int | None
+
+    token_ids: tuple[int, ...]  # frozen tuple for hashability
     start: int
     end: int
 
     # === Session tracking (not part of cache identity) ===
     request_id: str = field(compare=False)
+
+    # === Per-user isolation salt (part of cache identity) ===
+    # msgspec encodes dataclasses as maps, so forward wire compatibility
+    # works by field name: an old payload without ``cache_salt`` decodes
+    # on new code using the default "". Placing the field last is a style
+    # choice — all defaulted fields must come after non-defaulted ones.
+    #
+    # Invariant: must not contain ``@``, ``/``, ``\``, or NUL, and
+    # must be <= 128 chars — same rationale as ObjectKey (see
+    # ObjectKey.cache_salt). Validated in __post_init__.
+    cache_salt: str = ""
 
     # Request-scoped LMCache configuration passed across the IPC boundary.
     # It is metadata, not part of cache identity.
@@ -60,25 +69,22 @@ class IPCCacheServerKey:
     # lookups reject it.
     num_kv_readers: int = field(default=0, compare=False)
 
-    @property
-    def model_name(self) -> str:
-        """Read model_name from the identity."""
-        return self.identity.model_name
+    # Duplicated from ObjectKey — cannot import ObjectKey here due to
+    # circular dependency (api.py imports IPCCacheServerKey).
+    _SALT_FORBIDDEN_CHARS = frozenset("@/\\\x00")
+    _SALT_MAX_LEN = 128
 
-    @property
-    def cache_salt(self) -> str:
-        """Read cache_salt from the identity."""
-        return self.identity.cache_salt
-
-    @property
-    def world_size(self) -> int:
-        """Read world_size from the identity."""
-        return self.identity.world_size
-
-    @property
-    def worker_id(self) -> int | None:
-        """Read worker_id from the identity."""
-        return self.identity.worker_id
+    def __post_init__(self) -> None:
+        bad = self._SALT_FORBIDDEN_CHARS & set(self.cache_salt)
+        if bad:
+            raise ValueError(
+                f"cache_salt must not contain {bad!r} (got {self.cache_salt!r})"
+            )
+        if len(self.cache_salt) > self._SALT_MAX_LEN:
+            raise ValueError(
+                f"cache_salt exceeds max length {self._SALT_MAX_LEN} "
+                f"(got {len(self.cache_salt)})"
+            )
 
     # Helper function for unit tests only
     @classmethod
@@ -94,23 +100,19 @@ class IPCCacheServerKey:
         cache_salt: str = "",
         num_kv_readers: int = 1,
         request_configs: dict[str, Any] | None = None,
-        tags: Mapping[str, str] | None = None,
     ) -> "IPCCacheServerKey":
         """Create a key from token ids. Only used by the tests."""
         return cls(
+            model_name=model_name,
+            world_size=world_size,
+            worker_id=worker_id,
             num_kv_readers=num_kv_readers,
-            request_id=request_id,
-            request_configs=request_configs,
-            identity=IPCKeyIdentity(
-                world_size=world_size,
-                worker_id=worker_id,
-                model_name=model_name,
-                cache_salt=cache_salt,
-                tags=tags if tags is not None else {},
-            ),
             token_ids=tuple(token_ids),
             start=start,
             end=end,
+            request_id=request_id,
+            cache_salt=cache_salt,
+            request_configs=request_configs,
         )
 
     def require_num_kv_readers(self) -> int:
@@ -132,7 +134,18 @@ class IPCCacheServerKey:
 
     def no_worker_id_version(self) -> "IPCCacheServerKey":
         """Create a copy with worker_id=None for lookup requests."""
-        return replace(self, identity=replace(self.identity, worker_id=None))
+        return IPCCacheServerKey(
+            model_name=self.model_name,
+            world_size=self.world_size,
+            worker_id=None,
+            num_kv_readers=self.num_kv_readers,
+            token_ids=self.token_ids,
+            start=self.start,
+            end=self.end,
+            request_id=self.request_id,
+            cache_salt=self.cache_salt,
+            request_configs=self.request_configs,
+        )
 
 
 # Type exports

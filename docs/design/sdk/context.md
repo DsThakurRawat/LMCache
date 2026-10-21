@@ -90,9 +90,8 @@ model name is suffixed `##query`, so the lookups below use that key):
 
 ## Cache addressing
 
-Both build an `IPCCacheServerKey(identity=IPCKeyIdentity(model_name=model_name, cache_salt=cache_salt,
-world_size=1, worker_id=0), token_ids=token_ids, start=0,
-end=<chunk-aligned>, request_id=request_id)`. The server resolves it to per-chunk `ObjectKey`s;
+Both build an `IPCCacheServerKey(model_name, world_size=1, worker_id=0, token_ids, start=0,
+end=<chunk-aligned>, request_id, cache_salt)`. The server resolves it to per-chunk `ObjectKey`s;
 **cache identity** = token-chunk hashes + `model_name` + `kv_rank(worker_id)` + `cache_salt`.
 `request_id` (`store-`/`retrieve-<uuid>`) only keys the per-request session, not cache identity.
 

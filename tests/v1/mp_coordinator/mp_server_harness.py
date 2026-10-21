@@ -38,7 +38,6 @@ import zmq
 
 # First Party
 from lmcache.utils import EngineType
-from lmcache.v1.cache_identity import IPCKeyIdentity
 from lmcache.v1.distributed.api import EncodedObjectKey, ObjectKey, Tier
 from lmcache.v1.mp_coordinator.api import CacheEventBatch
 from lmcache.v1.mp_coordinator.app import create_app
@@ -598,17 +597,15 @@ class KVClient:
             )
         request_id = uuid.uuid4().hex
         key = IPCCacheServerKey(
-            identity=IPCKeyIdentity(
-                model_name=self.model_name,
-                cache_salt=cache_salt,
-                world_size=1,
-                worker_id=0,
-            ),
             request_id=request_id,
             num_kv_readers=1,
             token_ids=tuple(token_ids),
             start=0,
             end=chunks * CHUNK_SIZE,
+            model_name=self.model_name,
+            cache_salt=cache_salt,
+            world_size=1,
+            worker_id=0,
         )
         event = self._transfer.create_recorded_event()
         stored = self._transfer.submit_store(

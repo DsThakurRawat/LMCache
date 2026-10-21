@@ -228,3 +228,7 @@ On macOS, Linux-specific tests that call `os.eventfd_read` or inspect
 need Linux validation. Service integration suites such as Bigtable also need
 the root `bigtable_emulator` fixture; `--confcutdir=tests/v1` intentionally omits
 it. Keep these exclusions separate from passing CPU key/transport checks.
+
+If `git fetch` fails with unresolved deltas, treat the existing remote-tracking
+ref as stale. Verify the current revision and relevant files through the GitHub
+API before claiming they match dev; do not infer freshness from `origin/dev`.

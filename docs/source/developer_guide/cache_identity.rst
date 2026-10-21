@@ -1,44 +1,44 @@
-Cache key identity
-==================
+Cache identity and L1 attributes
+================================
 
-Each key stores a typed ``identity`` for cache attributes interpreted by
-consumers. ``ObjectKeyIdentity`` identifies stored chunks; ``IPCKeyIdentity``
-contains the model, isolation and sharding attributes of a request. Their fields
-differ, so they are separate classes rather than a shared namespace.
+Clients pass matching tags and transient attributes through the existing
+``IPCCacheServerKey.request_configs`` dictionary. The IPC key and its wire
+schema retain their dev definitions.
 
 .. code-block:: python
 
-   from lmcache.v1.cache_identity import ObjectKeyIdentity
-   from lmcache.v1.distributed.api import ObjectKey
+   request_configs = {
+       "lmcache.tag.adapter_revision": "abc123",
+       "lmcache.xattr.owner": "alice",
+       "lmcache.xattr.priority": 1,
+   }
 
-   key = ObjectKey(identity=ObjectKeyIdentity(
-       chunk_hash=b"1234",
-       kv_rank=0,
-       model_name="org/model",
-       cache_salt="tenant-a",
-       tags={"adapter_revision": "abc123"},
-   ))
-   assert key.chunk_hash == key.identity.chunk_hash
+The server extracts ``lmcache.tag.*`` into ``ObjectKey.identity.tags`` and
+``lmcache.xattr.*`` into ``ObjectKey.attrs``, removing each prefix. Unrelated
+request configurations keep their existing meaning. Tags use nonempty names
+and string values; attrs preserve their request-config values.
 
 ``ObjectKeyIdentity`` contains ``chunk_hash``, ``kv_rank``, ``model_name``,
-``object_group_id``, ``cache_salt`` and ``tags``. ``IPCKeyIdentity`` contains
-``world_size``, ``worker_id``, ``model_name``, ``cache_salt`` and ``tags``.
-``token_ids``, ``start`` and ``end`` remain on ``IPCCacheServerKey`` as request
-inputs and operation range, and still participate in its equality/hashing.
-IPC conversion constructs object identities explicitly, preserving model,
-salt and tags.
+``object_group_id``, ``cache_salt`` and immutable, name-sorted ``tags``.
+Read-only key properties forward reads to the identity without duplicating it.
 
-Tags accept a dictionary, copy and sort it, and expose an immutable mapping.
-Insertion order does not affect matching, hashing or storage names. Key
-properties are read-only views of the identity; they do not duplicate state.
-Session/request metadata remains outside identity and does not affect matching.
+``attrs`` is mutable, copied per object and excluded from equality/hashing.
+An L1 consumer can delete one attribute directly:
+
+.. code-block:: python
+
+   owner = key.attrs.pop("owner", None)
+
+Changing attrs does not change a cache hit or create another entry. Attrs are
+omitted from L2 store queues, P2P messages, persistent key names, HTTP/JSON key
+projections, traces and coordinator captures/pins.
 
 L2 adapters call ``ObjectKey.to_storage_key()``, ``to_filename()`` or
-``format_storage_key()``. Untagged storage names remain unchanged. Sorted tags
-use a reversible token; extended FS filenames must fit within 255 UTF-8 bytes.
+``format_storage_key()``. Untagged names remain unchanged; sorted tags use a
+reversible token. Extended FS filenames must fit within 255 UTF-8 bytes.
 
 ``EncodedObjectKey`` carries an ``EncodedObjectKeyIdentity`` under ``identity``
-for HTTP/JSON, with ``chunk_hash_hex`` instead of bytes. Constructors and
-msgspec/protobuf messages also use nested identities. Upgrade clients, servers,
-P2P peers and control-plane consumers together. This API does not activate
-precision isolation in an engine integration.
+for HTTP/JSON, with ``chunk_hash_hex`` instead of bytes. Object/P2P and
+control-plane consumers need coordinated schema upgrades. IPC clients retain
+the dev message shape. This API does not activate precision isolation in an
+engine integration.

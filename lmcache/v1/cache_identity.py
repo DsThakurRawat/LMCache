@@ -4,7 +4,7 @@
 # Standard
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import NoReturn
+from typing import Any, NoReturn
 import base64
 
 # Third Party
@@ -67,6 +67,28 @@ def decode_tags(token: str) -> Mapping[str, str]:
     return tags
 
 
+def get_request_tags(request_configs: Mapping[str, Any] | None) -> Mapping[str, str]:
+    """Extract and canonicalize matching tags from request configuration."""
+    return normalize_identity(
+        "",
+        "",
+        {
+            name.removeprefix("lmcache.tag."): value
+            for name, value in (request_configs or {}).items()
+            if name.startswith("lmcache.tag.")
+        },
+    )
+
+
+def get_request_attrs(request_configs: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Extract transient L1 attributes from request configuration."""
+    return {
+        name.removeprefix("lmcache.xattr."): value
+        for name, value in (request_configs or {}).items()
+        if name.startswith("lmcache.xattr.")
+    }
+
+
 @dataclass(frozen=True)
 class ObjectKeyIdentity:
     """Complete matching identity of a stored object."""
@@ -97,54 +119,6 @@ class ObjectKeyIdentity:
                 self.cache_salt,
                 tuple(self.tags.items()),
             )
-        )
-
-    def tags_token(self) -> str:
-        """Return the canonical encoding of opaque matching tags."""
-        return encode_tags(self.tags)
-
-
-@dataclass(frozen=True, order=False)
-class IPCKeyIdentity:
-    """Model, isolation and sharding attributes of an IPC request."""
-
-    world_size: int
-    worker_id: int | None
-    model_name: str
-    cache_salt: str = ""
-    tags: Mapping[str, str] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        object.__setattr__(
-            self,
-            "tags",
-            normalize_identity(self.model_name, self.cache_salt, self.tags),
-        )
-
-    def __hash__(self) -> int:
-        return hash(
-            (
-                self.world_size,
-                self.worker_id,
-                self.model_name,
-                self.cache_salt,
-                tuple(self.tags.items()),
-            )
-        )
-
-    def __lt__(self, other: "IPCKeyIdentity") -> bool:
-        return (
-            self.world_size,
-            self.worker_id,
-            self.model_name,
-            self.cache_salt,
-            tuple(self.tags.items()),
-        ) < (
-            other.world_size,
-            other.worker_id,
-            other.model_name,
-            other.cache_salt,
-            tuple(other.tags.items()),
         )
 
     def tags_token(self) -> str:

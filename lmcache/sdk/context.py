@@ -20,7 +20,6 @@ import zmq
 from lmcache.logging import init_logger
 from lmcache.sdk.cache_kind import LMCacheSDKCacheKind
 from lmcache.sdk.wrapper.contiguous import ContiguousTransferWrapper
-from lmcache.v1.cache_identity import IPCKeyIdentity
 from lmcache.v1.gpu_connector.utils import (
     DiscoverableKVCache,
     LayoutHints,
@@ -534,16 +533,14 @@ class LMCacheSDKContext:
             IPCCacheServerKey: The constructed key.
         """
         return IPCCacheServerKey(
-            identity=IPCKeyIdentity(
-                model_name=self._model_name,
-                cache_salt=cache_salt,
-                world_size=self._world_size,
-                worker_id=worker_id,
-            ),
-            request_id=request_id,
-            request_configs=request_configs,
+            model_name=self._model_name,
+            world_size=self._world_size,
             num_kv_readers=self._num_kv_readers,
+            worker_id=worker_id,
             token_ids=tuple(token_ids),
             start=start,
             end=end,
+            request_id=request_id,
+            cache_salt=cache_salt,
+            request_configs=request_configs,
         )

@@ -8,8 +8,8 @@ Could be implemented by native code in the future
 
 # Standard
 from collections.abc import Callable
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, get_args
+from dataclasses import dataclass, field, replace
+from typing import TYPE_CHECKING, Any, Literal, get_args
 import enum
 import urllib.parse
 
@@ -22,6 +22,8 @@ from lmcache.v1.cache_identity import (
     EncodedObjectKeyIdentity,
     ObjectKeyIdentity,
     decode_tags,
+    get_request_attrs,
+    get_request_tags,
 )
 
 if TYPE_CHECKING:
@@ -109,6 +111,14 @@ class ObjectKey:
     """
 
     identity: ObjectKeyIdentity
+    attrs: dict[str, Any] = field(default_factory=dict, compare=False, repr=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "attrs", dict(self.attrs))
+
+    def without_attrs(self) -> "ObjectKey":
+        """Return an identity-equivalent key without transient L1 attributes."""
+        return replace(self, attrs={}) if self.attrs else self
 
     @property
     def chunk_hash(self) -> bytes:
@@ -724,19 +734,22 @@ def ipc_key_to_object_keys(
     """
     # The (chunk_hash, kv_rank) expansion is independent of the object group,
     # so compute it once and reuse it for every group.
+    tags = get_request_tags(ipc_key.request_configs)
+    attrs = get_request_attrs(ipc_key.request_configs)
     kv_ranks = _lookup_kv_ranks(ipc_key)
 
     return [
         [
             ObjectKey(
                 identity=ObjectKeyIdentity(
-                    model_name=ipc_key.identity.model_name,
-                    cache_salt=ipc_key.identity.cache_salt,
-                    tags=ipc_key.identity.tags,
+                    model_name=ipc_key.model_name,
+                    cache_salt=ipc_key.cache_salt,
+                    tags=tags,
                     chunk_hash=chunk_hash,
                     kv_rank=kv_rank,
                     object_group_id=object_group_id,
-                )
+                ),
+                attrs=attrs,
             )
             for chunk_hash in chunk_hashes
             for kv_rank in kv_ranks
@@ -781,6 +794,8 @@ def ipc_key_to_grouped_object_keys(
         size; a worker-specific key yields that rank only. ``cache_salt`` is
         taken from ``ipc_key``.
     """
+    tags = get_request_tags(ipc_key.request_configs)
+    attrs = get_request_attrs(ipc_key.request_configs)
     kv_ranks = _lookup_kv_ranks(ipc_key)
     rows: list[GroupedObjectKeys] = []
     for object_group_id in object_group_ids:
@@ -802,13 +817,14 @@ def ipc_key_to_grouped_object_keys(
                     keys=[
                         ObjectKey(
                             identity=ObjectKeyIdentity(
-                                model_name=ipc_key.identity.model_name,
-                                cache_salt=ipc_key.identity.cache_salt,
-                                tags=ipc_key.identity.tags,
+                                model_name=ipc_key.model_name,
+                                cache_salt=ipc_key.cache_salt,
+                                tags=tags,
                                 chunk_hash=chunk_hash,
                                 kv_rank=kv_rank,
                                 object_group_id=object_group_id,
-                            )
+                            ),
+                            attrs=attrs,
                         )
                         for chunk_hash in chunk_hashes
                     ],

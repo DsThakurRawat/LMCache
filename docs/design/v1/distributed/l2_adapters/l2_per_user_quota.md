@@ -140,13 +140,13 @@ Scheduler path (LOOKUP):
   scheduler_adapter.maybe_submit_lookup_request(
       request_id, token_ids, cache_salt=tracker.cache_salt)
   → _create_key(..., cache_salt="alice")
-  → IPCCacheServerKey(identity=IPCKeyIdentity(model_name=model_name, cache_salt="alice", ...))  ──LOOKUP──►  MP Server
+  → IPCCacheServerKey(model_name=model_name, cache_salt="alice", ...)  ──LOOKUP──►  MP Server
                                                            │
 Worker path (STORE/RETRIEVE):                              │
   worker_adapter.batched_submit_store_requests(            │
       request_ids, ops, event, cache_salts=["alice", ...])    │
   → _create_key(..., cache_salt="alice")                      │
-  → IPCCacheServerKey(identity=IPCKeyIdentity(model_name=model_name, cache_salt="alice", ...)) ──STORE──►  MP Server
+  → IPCCacheServerKey(model_name=model_name, cache_salt="alice", ...) ──STORE──►  MP Server
                                                            │
                                               key.cache_salt = "alice"
                                               ipc_key_to_object_keys(key, hashes)
@@ -168,21 +168,21 @@ participating in `ObjectKey.__eq__` / `__hash__`.
 ```python
 @dataclass(order=True, frozen=True)
 class IPCCacheServerKey:
-    identity: IPCKeyIdentity
+    model_name: str
+    world_size: int
+    worker_id: int | None
     token_ids: tuple[int, ...]
     start: int
     end: int
-    request_id: str = field(compare=False)
+    request_id: str = field(compare=False)   # position 7 — unchanged
+    cache_salt: str = ""                         # position 8 — appended at end
 ```
 
-Each key stores its matching fields once in its own typed identity. The key exposes them
-through read-only properties. Msgspec map payloads and protobuf/JSON messages
-now carry a nested identity; clients, servers and control-plane consumers must
-upgrade together. Existing untagged L2 names retain their original model/salt
-positions.
-
-`no_worker_id_version()` replaces only `identity.worker_id`, preserving the
-model, salt and tags; the outer token inputs and range remain unchanged.
+`IPCCacheServerKey` retains the dev definition and carries request-specific
+configuration through `request_configs`. The server extracts matching tags
+from `lmcache.tag.*` and transient L1 attrs from `lmcache.xattr.*` when it builds
+ObjectKeys. Object/P2P projections carry object identity without transient attrs.
+Existing untagged L2 names retain their model/salt positions.
 
 ### 3. Dynamic Per-User Quotas via `QuotaManager`
 
@@ -356,10 +356,13 @@ Both adapters' `_create_key()` passes `cache_salt` through:
 ```python
 def _create_key(self, token_ids, start, end, request_id, cache_salt=""):
     return IPCCacheServerKey(
-        identity=IPCKeyIdentity(model_name=self.model_name, cache_salt=cache_salt,
-            world_size=self.world_size, worker_id=...),
-        token_ids=tuple(token_ids), start=start, end=end,
+        model_name=self.model_name,
+        world_size=self.world_size,
+        worker_id=...,
+        token_ids=tuple(token_ids),
+        start=start, end=end,
         request_id=request_id,
+        cache_salt=cache_salt,
     )
 ```
 
@@ -787,7 +790,7 @@ it through. Update serialization. No behavioral change with `cache_salt=""`.
 | File | Change |
 |------|--------|
 | `lmcache/v1/distributed/api.py` | `cache_salt: str = ""` on `ObjectKey` with `__post_init__` validation (`@`, `/`, `\`, NUL, length cap on `cache_salt`; `@` rejected on `model_name`); `ipc_key_to_object_keys()` reads `ipc_key.cache_salt` directly (no separate param) |
-| `lmcache/v1/multiprocess/custom_types.py` | `identity: IPCKeyIdentity` on `IPCCacheServerKey`; model/salt properties delegate to it, and key helpers preserve the complete identity |
+| `lmcache/v1/multiprocess/custom_types.py` | Unchanged dev `IPCCacheServerKey`; use its existing `request_configs` field |
 | `lmcache/v1/multiprocess/server.py` | No code changes — existing `ipc_key_to_object_keys(key, chunk_hashes)` calls now carry salt automatically |
 | `lmcache/integration/vllm/vllm_multi_process_adapter.py` | Scheduler + worker `_create_key()` now forward `cache_salt` to `IPCCacheServerKey` |
 | `lmcache/v1/distributed/l2_adapters/native_connector_l2_adapter.py` | `_object_key_to_string()` appends trailing `@<cache_salt>` when salted; un-salted output is unchanged |

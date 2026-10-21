@@ -1,70 +1,58 @@
-# Cache key identity
+# Cache identity and transient L1 attributes
 
-## Identity and metadata
+## Request transport
 
-Each key owns a typed `identity` for cache attributes interpreted by consumers.
-Opaque matching dimensions use `tags`. IPC request inputs and operation ranges
-remain separate from these attributes.
-
-- `ObjectKeyIdentity`: `chunk_hash`, `kv_rank`, `model_name`, `object_group_id`,
-  `cache_salt`, `tags`.
-- `IPCKeyIdentity`: `world_size`, `worker_id`, `model_name`, `cache_salt`, `tags`.
-
-These are separate types because requests address token ranges and workers,
-whereas stored objects address chunk hashes, KV ranks and object groups. They
-share tag normalization, not a common identity container or base class.
-`ObjectKey` stores only its identity. `IPCCacheServerKey` carries `token_ids`,
-`start` and `end` outside identity: these are inputs to chunk hashing and the
-range of this operation, rather than the identity of any one stored object.
-They still participate in IPC key equality/hashing, so different content or
-ranges remain distinct. `request_id`, `request_configs` and `num_kv_readers`
-also stay outside identity and are excluded from equality/hashing.
-Read-only properties on the keys forward existing field reads to the identity;
-they do not duplicate state.
+`IPCCacheServerKey` and its protobuf message remain unchanged from dev. Clients
+use the existing `request_configs` field:
 
 ```python
-from lmcache.v1.cache_identity import ObjectKeyIdentity
-from lmcache.v1.distributed.api import ObjectKey
-
-key = ObjectKey(identity=ObjectKeyIdentity(
-    chunk_hash=b"1234", kv_rank=0, model_name="org/model",
-    cache_salt="tenant-a", tags={"adapter_revision": "abc123"},
-))
+request_configs = {
+    "lmcache.tag.adapter_revision": "abc123",
+    "lmcache.xattr.owner": "alice",
+    "lmcache.xattr.priority": 1,
+    "lmcache.skip_load": True,
+}
 ```
 
-Tags are a copied, immutable mapping sorted by name. Insertion order cannot
-change equality, hashing, serialization or persistent names. Model names exclude
-`@`; salts exclude `@`, `/`, `\`, NUL and are at most 128 characters.
-The object group id must be nonnegative.
+Server-side IPC-to-object expansion strips `lmcache.tag.` into matching tags
+and `lmcache.xattr.` into transient attributes. Other request configurations
+remain available to their existing consumers. Tags require nonempty names and
+string values. Xattrs preserve their request-config values.
 
-## Conversion and transport
+## Object identity and attrs
 
-IPC-to-object expansion explicitly copies model, salt and tags, hashes tokens,
-and expands worker/rank and object group coordinates. It constructs a new
-`ObjectKeyIdentity`; the two identity types are never interchangeable.
-Temporary serde keys replace only the identity's chunk hash. Session lock
-release compares model, salt, tags, world size and tokens, then checks the
-requested subrange; it cannot require complete identity equality because a
-retrieve selects a worker and may narrow the lookup range. Store batching
-similarly groups by rank, model, salt and tags rather than by complete identity,
-so different chunks still share a batch.
+`ObjectKeyIdentity` contains `chunk_hash`, `kv_rank`, `model_name`,
+`object_group_id`, `cache_salt` and `tags`. Tags are copied into an immutable
+mapping sorted by name. Insertion order cannot change equality, hashing,
+serialization or storage names. Explicit interpreted identity fields remain
+typed; opaque matching dimensions use tags.
 
-`EncodedObjectKeyIdentity` is the JSON projection of `ObjectKeyIdentity`, using
-`chunk_hash_hex` instead of bytes. `EncodedObjectKey` wraps this projection as
-`identity`. Msgspec and protobuf IPC/P2P schemas likewise carry the appropriate
-typed identity. These constructor and wire changes require coordinated client,
-server, P2P and control-plane upgrades. Old protobuf field numbers are reserved.
-Invalid nested fields fail HTTP body validation (`422`); invalid hex fails key
-conversion (`400`).
+`ObjectKey.attrs` is a separate mutable dictionary, excluded from equality,
+hashing and storage names. Every expanded object receives its own dictionary.
+An L1 consumer can remove an attribute without changing object identity:
 
-Coordinator captures retain their positional format. Trace and pin decoders
-also accept pre-PR flattened records; new records use nested `identity`.
+```python
+owner = key.attrs.pop("owner", None)
+```
 
-## Storage encoding
+Changing xattrs does not create another cache entry. Model/salt validation and
+nonnegative object-group validation remain on object identity. Read-only key
+properties forward field reads without duplicating identity state.
 
-L2 adapters call `ObjectKey.to_storage_key()`, `to_filename()` or
-`format_storage_key()`, and decoding/sharding use key methods. Adapters do not
-select individual identity fields.
+## Server state and storage boundaries
+
+IPC equality still ignores `request_configs`, as on dev. Session lock release
+therefore compares extracted matching tags explicitly. Pending SHM transfers
+include canonical tags in their server-side lookup key, so otherwise equal IPC
+requests with different tags do not overwrite or commit each other's state.
+Store batching groups by rank, model, salt and tags, allowing compatible chunks
+to share a batch.
+
+Attrs are available during L1 insertion. L2 store queues and P2P lookup/unlock
+calls remove them using `ObjectKey.without_attrs()`. The explicit P2P gRPC codec
+and HTTP/JSON projections carry identity only; transient attrs do not add proto
+fields. Traces, coordinator captures/pins and serde temporary keys also omit
+attrs. L2 adapters obtain names and shards through key methods.
 
 ```text
 no tags, no salt: <model>@<rank>@<group>@<hash>
@@ -78,11 +66,15 @@ versions, malformed maps and noncanonical tokens are rejected. Existing
 untagged names remain unchanged. Native `keys.h` preserves the opaque tag token;
 Python/native FS reject extended filenames exceeding 255 UTF-8 bytes.
 
-## Scope and validation
+## Compatibility and scope
 
-This PR provides the identity model and propagation, including L2. It does not
-predefine KV encoding attributes or activate an engine precision producer.
-Interpreted properties need real producer/consumer contracts before being added.
-Tests cover immutable sorted tags, identity matching, IPC/object conversion,
-protocol round trips, sessions, batching, recovery and Python/native storage
-parity. CPU validation does not establish hardware inference correctness.
+IPC constructors, msgspec messages and protobuf wire shape retain dev behavior.
+Object/P2P and HTTP/control-plane schemas use nested object identity and require
+coordinated upgrades of their consumers. `EncodedObjectKeyIdentity` retains
+hexadecimal chunk hashes for JSON. Legacy untagged L2 data, flattened trace/pin
+records and positional coordinator captures remain readable.
+
+This PR does not predefine KV encoding fields or activate an engine precision
+producer. Tests cover request-config extraction, sorted tags, mutable attrs,
+identity isolation, session/transfer separation, protocol projections and L2
+naming. CPU checks do not establish hardware inference correctness.

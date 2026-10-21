@@ -170,6 +170,7 @@ def test_event_fds_are_distinct_and_registered():
 
 def test_lookup_forwards_group_layout_descs_and_returns_addresses():
     keys = [_key(0), _key(1), _key(2)]
+    keys[0].attrs["owner"] = "alice"
     addresses = [
         TransferChannelAddress(offset=100, size=10),
         TransferChannelAddress(offset=200, size=20),
@@ -186,6 +187,10 @@ def test_lookup_forwards_group_layout_descs_and_returns_addresses():
         # payload.
         req_client.p2p_lookup_and_lock.assert_called_once_with(keys, group_layout_descs)
         assert req_client.p2p_lookup_and_lock.call_args.args[1] is group_layout_descs
+        assert all(
+            not key.attrs for key in req_client.p2p_lookup_and_lock.call_args.args[0]
+        )
+        assert keys[0].attrs == {"owner": "alice"}
 
         bitmap = adapter.query_lookup_and_lock_result(task_id)
         assert bitmap is not None
@@ -325,10 +330,14 @@ def test_load_deadline_expired_yields_failure():
 
 def test_unlock_sends_rpc_and_clears_addresses():
     keys = [_key(0), _key(1)]
+    keys[0].attrs["owner"] = "alice"
     with _adapter() as (adapter, req_client, _tc_ctx, _tc, _notifier):
         adapter._remote_addresses[keys[0]] = TransferChannelAddress(offset=1, size=1)
         adapter.submit_unlock(keys)
         req_client.p2p_unlock_objects.assert_called_once_with(keys)
+        assert all(
+            not key.attrs for key in req_client.p2p_unlock_objects.call_args.args[0]
+        )
         assert keys[0] not in adapter._remote_addresses
 
 
