@@ -86,6 +86,20 @@ Test dependencies: `uv pip install -r requirements/test.txt`
 
 Pytest marker: `@pytest.mark.no_shared_allocator` disables the shared-allocator monkeypatch for a test.
 
+### CPU-only connector import checks
+
+Use Python 3.12 with PyTorch and the common native extensions installed.
+A fresh worktree does not include ignored native build artifacts; build them
+with `NO_GPU_EXT=1 python setup.py build_ext --inplace` before running layout
+and connector import tests. For these focused checks, use
+`python -m pytest --confcutdir=tests/v1 tests/v1/gpu_connector/` so the root
+`tests/conftest.py` GPU allocator fixtures are not loaded. This validates CPU
+imports and shared layout/GDS behavior, not accelerator kernel roundtrips.
+When combining these tests with `tests/inprocess/`, use `--noconftest` for
+self-contained CPU checks spanning both trees; normal accelerator CI must
+retain the root fixtures. Mirrored test directories with identical module
+names need package `__init__.py` files to avoid pytest import mismatches.
+
 ### Testing Practices
 
 - Write tests against the **public interface and docstring contract**, not the implementation. Test as if you don't know the internals — verify that behavior matches what the docstring describes.
@@ -212,6 +226,8 @@ self-check with the `pre-pr-check` skill (both under `.claude/skills/`).
 On macOS, verify `python3 --version` before using AST-based migration tools;
 the system interpreter may be Python 3.9 and cannot parse this repo's newer
 syntax. Use the prepared Python 3.12 environment for source audits and tests.
+The `ban-direct-torch-device` pre-commit hook also runs `python3` from `PATH`;
+put the Python 3.12 environment first in `PATH` when running pre-commit.
 
 A source-only checkout may import the lightweight key types but the root
 `tests/conftest.py` imports GPU connectors and requires `lmcache.device_ops`.
@@ -232,3 +248,10 @@ it. Keep these exclusions separate from passing CPU key/transport checks.
 If `git fetch` fails with unresolved deltas, treat the existing remote-tracking
 ref as stale. Verify the current revision and relevant files through the GitHub
 API before claiming they match dev; do not infer freshness from `origin/dev`.
+
+If Git reports missing blobs or `unable to read sha1 file` during a merge,
+use a fresh repository rather than resolving against the incomplete checkout.
+A failed merge can leave partially updated tracked files and new untracked
+files. If a full fetch ends with `curl 18`/`early EOF`, a fresh fetch with
+`--filter=blob:none` can reduce transfer size; check out the target refs before
+merging so Git fetches their required blobs.

@@ -106,13 +106,12 @@ def test_store_owner_callback_round_trip(
 
     def copy(*args: Any, **kwargs: Any) -> None:
         order.append("copy")
-        copied.extend(args[2])
+        copied.extend(args[1])
         if failure == "copy" and len(copied) == 2:
             raise RuntimeError("device copy failed")
         if failure == "owner" and len(copied) == 2:
             copied[-1].reset_l1_manager()
 
-    monkeypatch.setattr(transfer, "transfer_kv_per_object_group", copy)
     keys = [
         ObjectKey(
             identity=ObjectKeyIdentity(
@@ -135,6 +134,7 @@ def test_store_owner_callback_round_trip(
     cache_context.cupy_stream.ptr = 123
     cache_context.calculate_num_blocks.return_value = 1
     cache_context.hold_imported_event.return_value = 7
+    cache_context.transfer_object_group.side_effect = copy
     cache_context.kv_layer_groups_manager = SimpleNamespace(
         num_object_groups=2,
         num_kernel_groups=2,
